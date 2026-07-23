@@ -3,6 +3,9 @@ import { supabase } from './supabase'
 import AssetsTab from './AssetsTab'
 import TicketsTab from './TicketsTab'
 import AttendanceTab from './AttendanceTab'
+import ExpensesTab from './ExpensesTab'
+import ReportsTab from './ReportsTab'
+import TeamTab from './TeamTab'
 
 const VENTURES = ['IDC', 'EasyGo']
 const SEGMENTS = ['Real Estate', 'Hospital / Healthcare', 'Education', 'SMB / Retail', 'Manufacturing', 'Other']
@@ -35,6 +38,9 @@ export default function AmcApp({ session, onSignOut }) {
   const [tickets, setTickets] = useState([])
   const [reports, setReports] = useState([])
   const [attendance, setAttendance] = useState([])
+  const [expenses, setExpenses] = useState([])
+  const [feedback, setFeedback] = useState([])
+  const [staff, setStaff] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('dashboard')
   const [custForm, setCustForm] = useState(null)
@@ -48,13 +54,16 @@ export default function AmcApp({ session, onSignOut }) {
   }
 
   const loadAll = async () => {
-    const [c1, c2, c3, c4, c5, c6] = await Promise.all([
+    const [c1, c2, c3, c4, c5, c6, c7, c8, c9] = await Promise.all([
       supabase.from('customers').select('*').order('company'),
       supabase.from('contracts').select('*').order('end_date'),
       supabase.from('assets').select('*').order('asset_code'),
       supabase.from('tickets').select('*').order('created_at', { ascending: false }),
-      supabase.from('service_reports').select('*').order('date', { ascending: false }).limit(100),
-      supabase.from('attendance').select('*').order('check_in', { ascending: false }).limit(50),
+      supabase.from('service_reports').select('*').order('date', { ascending: false }).limit(500),
+      supabase.from('attendance').select('*').order('check_in', { ascending: false }).limit(500),
+      supabase.from('expenses').select('*').order('date', { ascending: false }).limit(1000),
+      supabase.from('feedback').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('staff_roles').select('*').order('email'),
     ])
     if (c1.error) flash('Load error: ' + c1.error.message)
     setCustomers(c1.data || [])
@@ -63,12 +72,32 @@ export default function AmcApp({ session, onSignOut }) {
     setTickets(c4.data || [])
     setReports(c5.data || [])
     setAttendance(c6.data || [])
+    setExpenses(c7.data || [])
+    setFeedback(c8.data || [])
+    setStaff(c9.data || [])
     setLoading(false)
   }
 
   useEffect(() => {
     loadAll()
   }, [])
+
+  useEffect(() => {
+    if (!loading) {
+      const allowed = {
+        admin: ['dashboard','customers','contracts','assets','tickets','attendance','expenses','reports','team'],
+        accounts: ['dashboard','tickets','expenses','reports'],
+        engineer: ['assets','tickets','attendance','expenses'],
+      }[role] || ['tickets']
+      if (!allowed.includes(tab)) setTab(allowed[0])
+    }
+  }, [role, loading])
+
+  const role = useMemo(() => {
+    const mine = staff.find((s) => s.email === session.user.email)
+    if (mine) return mine.role
+    return staff.length === 0 ? 'admin' : 'engineer'
+  }, [staff, session])
 
   const customersById = useMemo(() => {
     const m = {}
@@ -190,14 +219,16 @@ export default function AmcApp({ session, onSignOut }) {
         </div>
         <nav className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {[
-            ['dashboard', 'Dashboard'],
-            ['customers', 'Customers'],
-            ['contracts', 'Contracts'],
-            ['assets', 'Assets'],
-            ['tickets', 'Tickets'],
-            ['attendance', 'Attendance'],
-            ['reports', 'Reports'],
-          ].map(([k, t]) => (
+            ['dashboard', 'Dashboard', ['admin', 'accounts']],
+            ['customers', 'Customers', ['admin']],
+            ['contracts', 'Contracts', ['admin']],
+            ['assets', 'Assets', ['admin', 'engineer']],
+            ['tickets', 'Tickets', ['admin', 'accounts', 'engineer']],
+            ['attendance', 'Attendance', ['admin', 'engineer']],
+            ['expenses', 'Expenses', ['admin', 'accounts', 'engineer']],
+            ['reports', 'Reports', ['admin', 'accounts']],
+            ['team', 'Team', ['admin']],
+          ].filter(([, , roles]) => roles.includes(role)).map(([k, t]) => (
             <button key={k} onClick={() => setTab(k)}
               className={`px-4 py-2 text-sm rounded-t-md whitespace-nowrap ${tab === k ? 'bg-slate-50 text-slate-900 font-medium' : 'text-slate-300 hover:text-white'}`}>
               {t}
@@ -435,40 +466,25 @@ export default function AmcApp({ session, onSignOut }) {
             {tab === 'attendance' && (
               <AttendanceTab customers={customers} attendance={attendance} reload={loadAll} flash={flash} session={session} />
             )}
+            {tab === 'expenses' && (
+              <ExpensesTab customers={customers} expenses={expenses} reload={loadAll} flash={flash} session={session} role={role} />
+            )}
+            {tab === 'team' && role === 'admin' && (
+              <TeamTab staff={staff} reload={loadAll} flash={flash} session={session} />
+            )}
 
             {tab === 'reports' && (
-              <div className="bg-white rounded-lg border border-slate-200">
-                <p className="px-4 py-3 border-b border-slate-200 font-medium text-sm">Latest service reports ({reports.length})</p>
-                {reports.length === 0 ? (
-                  <p className="p-6 text-sm text-slate-500">
-                    Reports appear here automatically when engineers scan an asset QR on site and submit the checklist.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-slate-100">
-                    {reports.map((r) => {
-                      const asset = assetsById[r.asset_id]
-                      const cust = customersById[r.customer_id]
-                      const done = r.checklist ? Object.values(r.checklist).filter(Boolean).length : 0
-                      const total = r.checklist ? Object.keys(r.checklist).length : 0
-                      return (
-                        <li key={r.id} className="px-4 py-3 flex flex-wrap items-center gap-3 justify-between text-sm">
-                          <div>
-                            <p className="font-medium">
-                              {asset ? asset.asset_code : '—'} · {cust ? cust.company : 'Unknown'} — {r.result}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {r.date} · {r.engineer} · {done}/{total} checks · {r.issue_category}
-                              {r.parts_replaced ? ` · Parts: ${r.parts_replaced}` : ''}
-                            </p>
-                            {r.remarks && <p className="text-xs text-slate-400 mt-1">{r.remarks}</p>}
-                          </div>
-                          {asset && <a href={`#/asset/${asset.asset_code}`} className="text-xs text-indigo-600 hover:underline">Open asset</a>}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
+              <ReportsTab
+                customers={customers}
+                contracts={contracts}
+                assets={assets}
+                tickets={tickets}
+                reports={reports}
+                attendance={attendance}
+                expenses={expenses}
+                feedback={feedback}
+                flash={flash}
+              />
             )}
           </>
         )}

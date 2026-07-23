@@ -2,11 +2,15 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import AmcApp from './AmcApp'
 import AssetPage from './AssetPage'
+import FeedbackPage from './FeedbackPage'
 
 const parseHash = () => {
   const h = window.location.hash || ''
-  const m = h.match(/^#\/asset\/([A-Za-z0-9-]+)/)
-  return m ? { page: 'asset', code: m[1] } : { page: 'main' }
+  const a = h.match(/^#\/asset\/([A-Za-z0-9-]+)/)
+  if (a) return { page: 'asset', code: a[1] }
+  const f = h.match(/^#\/feedback\/([A-Za-z0-9-]+)/)
+  if (f) return { page: 'feedback', id: f[1] }
+  return { page: 'main' }
 }
 
 export default function App() {
@@ -40,6 +44,9 @@ export default function App() {
     if (error) setError(error.message)
     setBusy(false)
   }
+
+  // Feedback page is PUBLIC — customers open it from email without logging in
+  if (route.page === 'feedback') return <FeedbackPage ticketId={route.id} />
 
   if (checking)
     return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">Loading…</div>
