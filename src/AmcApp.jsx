@@ -82,6 +82,13 @@ export default function AmcApp({ session, onSignOut }) {
     loadAll()
   }, [])
 
+
+  const role = useMemo(() => {
+    const mine = staff.find((s) => s.email === session.user.email)
+    if (mine) return mine.role
+    return staff.length === 0 ? 'admin' : 'engineer'
+  }, [staff, session])
+
   useEffect(() => {
     if (!loading) {
       const allowed = {
@@ -92,12 +99,6 @@ export default function AmcApp({ session, onSignOut }) {
       if (!allowed.includes(tab)) setTab(allowed[0])
     }
   }, [role, loading])
-
-  const role = useMemo(() => {
-    const mine = staff.find((s) => s.email === session.user.email)
-    if (mine) return mine.role
-    return staff.length === 0 ? 'admin' : 'engineer'
-  }, [staff, session])
 
   const customersById = useMemo(() => {
     const m = {}
