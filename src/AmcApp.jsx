@@ -19,6 +19,7 @@ const daysLeft = (end) => {
   return Math.ceil((new Date(end + 'T23:59:59') - new Date()) / 86400000)
 }
 const contractStatus = (c) => {
+  if (c.closed) return { label: 'Closed', tone: 'bg-slate-200 text-slate-500' }
   const d = daysLeft(c.end_date)
   if (d === null) return { label: 'No end date', tone: 'bg-gray-100 text-gray-600' }
   if (d < 0) return { label: 'Expired', tone: 'bg-red-100 text-red-700' }
@@ -118,13 +119,14 @@ export default function AmcApp({ session, onSignOut }) {
   })
 
   const metrics = useMemo(() => {
-    const active = visibleContracts.filter((c) => (daysLeft(c.end_date) ?? 1) >= 0)
+    const active = visibleContracts.filter((c) => !c.closed && (daysLeft(c.end_date) ?? 1) >= 0)
     const acv = active.reduce((s, c) => {
       const mult = { Annual: 1, 'Half-Yearly': 2, Quarterly: 4, Monthly: 12 }[c.billing] || 1
       return s + (Number(c.value) || 0) * mult
     }, 0)
     const bucket = (lo, hi) =>
       visibleContracts.filter((c) => {
+        if (c.closed) return false
         const d = daysLeft(c.end_date)
         return d !== null && d >= lo && d <= hi
       }).length
@@ -144,7 +146,7 @@ export default function AmcApp({ session, onSignOut }) {
   const renewalQueue = useMemo(
     () =>
       [...visibleContracts]
-        .filter((c) => c.end_date)
+        .filter((c) => c.end_date && !c.closed)
         .sort((a, b) => (daysLeft(a.end_date) ?? 9999) - (daysLeft(b.end_date) ?? 9999))
         .slice(0, 12),
     [visibleContracts]
@@ -187,9 +189,22 @@ export default function AmcApp({ session, onSignOut }) {
     loadAll()
   }
   const deleteContract = async (id) => {
-    if (!window.confirm('Delete this contract?')) return
+    if (!window.confirm('Delete this contract permanently? Use Close instead to keep history.')) return
     const { error } = await supabase.from('contracts').delete().eq('id', id)
     if (error) return flash('Delete failed: ' + error.message)
+    loadAll()
+  }
+  const closeContract = async (contract) => {
+    if (!window.confirm(`Close the ${contract.tier} contract? It will leave the renewal radar and revenue totals, but stays in records.`)) return
+    const { error } = await supabase.from('contracts').update({ closed: true }).eq('id', contract.id)
+    if (error) return flash('Close failed: ' + error.message)
+    flash('Contract closed')
+    loadAll()
+  }
+  const reopenContract = async (contract) => {
+    const { error } = await supabase.from('contracts').update({ closed: false }).eq('id', contract.id)
+    if (error) return flash('Reopen failed: ' + error.message)
+    flash('Contract reopened')
     loadAll()
   }
 
@@ -289,6 +304,7 @@ export default function AmcApp({ session, onSignOut }) {
                             <div>
                               <p className="text-sm font-medium">{cust ? cust.company : 'Unknown customer'}</p>
                               <p className="text-xs text-slate-500">{c.tier} · {c.billing} · {inr(c.value)} · ends {c.end_date}</p>
+                              {c.scope && <p className="text-xs text-indigo-600 mt-0.5">📋 {c.scope}</p>}
                             </div>
                             <div className="flex items-center gap-2">
                               {cust && <span className={`text-xs px-2 py-1 rounded-full ${ventureStyle[cust.venture]}`}>{cust.venture}</span>}
@@ -443,10 +459,16 @@ export default function AmcApp({ session, onSignOut }) {
                             <div>
                               <p className="text-sm font-medium">{cust ? cust.company : 'Unknown'} — {c.tier}</p>
                               <p className="text-xs text-slate-500">{inr(c.value)} / {c.billing} · {c.start_date || '?'} → {c.end_date}</p>
+                              {c.scope && <p className="text-xs text-slate-400 mt-0.5">{c.scope}</p>}
                             </div>
                             <div className="flex items-center gap-2">
                               <span className={`text-xs px-2 py-1 rounded-full ${st.tone}`}>{st.label}</span>
                               <button onClick={() => setConForm({ ...c })} className="text-xs text-indigo-600 hover:underline">Edit</button>
+                              {!c.closed ? (
+                                <button onClick={() => closeContract(c)} className="text-xs text-amber-600 hover:underline">Close</button>
+                              ) : (
+                                <button onClick={() => reopenContract(c)} className="text-xs text-emerald-600 hover:underline">Reopen</button>
+                              )}
                               <button onClick={() => deleteContract(c.id)} className="text-xs text-red-500 hover:underline">Delete</button>
                             </div>
                           </li>
