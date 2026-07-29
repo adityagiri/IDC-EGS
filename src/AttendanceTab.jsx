@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { supabase } from './supabase'
+import { DataTable } from './ui'
 
 const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const btn = 'px-4 py-2 rounded-md text-sm font-medium'
@@ -99,42 +100,24 @@ export default function AttendanceTab({ customers, attendance, reload, flash, se
       </div>
 
       {/* Log */}
-      <div className="bg-white rounded-lg border border-slate-200">
-        <p className="px-4 py-3 border-b border-slate-200 font-medium text-sm">Attendance log (latest 50)</p>
-        {attendance.length === 0 ? (
-          <p className="p-4 text-sm text-slate-500">No entries yet. Engineers check in when reaching a site and check out when leaving — timings and GPS are recorded automatically.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {attendance.map((a) => (
-              <li key={a.id} className="px-4 py-3 text-sm flex flex-wrap items-center gap-3 justify-between">
-                <div>
-                  <p className="font-medium">
-                    {a.engineer} — {a.customer_id ? customersById[a.customer_id]?.company || 'Unknown site' : 'Unspecified site'}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {fmtDate(a.check_in)} · In {fmtTime(a.check_in)} → Out {fmtTime(a.check_out)}
-                    {a.check_out && a.check_in
-                      ? ` · ${Math.round((new Date(a.check_out) - new Date(a.check_in)) / 60000)} min on site`
-                      : ' · still on site'}
-                  </p>
-                </div>
-                <div className="flex gap-2 text-xs">
-                  {a.in_lat && (
-                    <a className="text-indigo-600 hover:underline" href={mapsLink(a.in_lat, a.in_lng)} target="_blank" rel="noreferrer">
-                      In-location
-                    </a>
-                  )}
-                  {a.out_lat && (
-                    <a className="text-indigo-600 hover:underline" href={mapsLink(a.out_lat, a.out_lng)} target="_blank" rel="noreferrer">
-                      Out-location
-                    </a>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <DataTable
+        empty="No entries yet. Engineers check in on reaching a site and check out when leaving — timings and GPS recorded automatically."
+        columns={[
+          { key: 'date', label: 'Date', width: '100px', render: (a) => fmtDate(a.check_in) },
+          { key: 'engineer', label: 'Engineer', width: '180px', render: (a) => <span className="text-xs">{a.engineer}</span> },
+          { key: 'site', label: 'Customer Site', render: (a) => a.customer_id ? customersById[a.customer_id]?.company || 'Unknown site' : 'Unspecified site' },
+          { key: 'in', label: 'Check In', width: '90px', render: (a) => fmtTime(a.check_in) },
+          { key: 'out', label: 'Check Out', width: '90px', render: (a) => fmtTime(a.check_out) },
+          { key: 'dur', label: 'Duration', width: '110px', align: 'right', render: (a) => a.check_out ? `${Math.round((new Date(a.check_out) - new Date(a.check_in)) / 60000)} min` : <span className="text-amber-600">on site</span> },
+          { key: 'gps', label: 'GPS', width: '150px', render: (a) => (
+            <span className="text-xs">
+              {a.in_lat && <a className="text-indigo-700 hover:underline mr-2" href={mapsLink(a.in_lat, a.in_lng)} target="_blank" rel="noreferrer">In-loc</a>}
+              {a.out_lat && <a className="text-indigo-700 hover:underline" href={mapsLink(a.out_lat, a.out_lng)} target="_blank" rel="noreferrer">Out-loc</a>}
+            </span>
+          ) },
+        ]}
+        rows={attendance}
+      />
     </div>
   )
 }

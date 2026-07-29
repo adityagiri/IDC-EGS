@@ -6,6 +6,7 @@ import AttendanceTab from './AttendanceTab'
 import ExpensesTab from './ExpensesTab'
 import ReportsTab from './ReportsTab'
 import TeamTab from './TeamTab'
+import { DataTable, SectionBar, chip } from './ui'
 
 const VENTURES = ['IDC', 'EasyGo']
 const SEGMENTS = ['Real Estate', 'Hospital / Healthcare', 'Education', 'SMB / Retail', 'Manufacturing', 'Other']
@@ -14,18 +15,15 @@ const BILLING = ['Annual', 'Half-Yearly', 'Quarterly', 'Monthly']
 
 const ventureStyle = { IDC: 'bg-indigo-100 text-indigo-800', EasyGo: 'bg-teal-100 text-teal-800' }
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
-const daysLeft = (end) => {
-  if (!end) return null
-  return Math.ceil((new Date(end + 'T23:59:59') - new Date()) / 86400000)
-}
+const daysLeft = (end) => (end ? Math.ceil((new Date(end + 'T23:59:59') - new Date()) / 86400000) : null)
 const contractStatus = (c) => {
   if (c.closed) return { label: 'Closed', tone: 'bg-slate-200 text-slate-500' }
   const d = daysLeft(c.end_date)
   if (d === null) return { label: 'No end date', tone: 'bg-gray-100 text-gray-600' }
   if (d < 0) return { label: 'Expired', tone: 'bg-red-100 text-red-700' }
-  if (d <= 30) return { label: `${d}d left — renew now`, tone: 'bg-red-100 text-red-700' }
-  if (d <= 60) return { label: `${d}d left — start renewal`, tone: 'bg-amber-100 text-amber-800' }
-  if (d <= 90) return { label: `${d}d left — plan QBR`, tone: 'bg-yellow-100 text-yellow-800' }
+  if (d <= 30) return { label: `${d}d — renew now`, tone: 'bg-red-100 text-red-700' }
+  if (d <= 60) return { label: `${d}d — start renewal`, tone: 'bg-amber-100 text-amber-800' }
+  if (d <= 90) return { label: `${d}d — plan QBR`, tone: 'bg-yellow-100 text-yellow-800' }
   return { label: `${d}d left`, tone: 'bg-emerald-100 text-emerald-700' }
 }
 
@@ -83,7 +81,6 @@ export default function AmcApp({ session, onSignOut }) {
     loadAll()
   }, [])
 
-
   const role = useMemo(() => {
     const mine = staff.find((s) => s.email === session.user.email)
     if (mine) return mine.role
@@ -93,9 +90,9 @@ export default function AmcApp({ session, onSignOut }) {
   useEffect(() => {
     if (!loading) {
       const allowed = {
-        admin: ['dashboard','customers','contracts','assets','tickets','attendance','expenses','reports','team'],
-        accounts: ['dashboard','tickets','expenses','reports'],
-        engineer: ['assets','tickets','attendance','expenses'],
+        admin: ['dashboard', 'customers', 'contracts', 'assets', 'tickets', 'attendance', 'expenses', 'reports', 'team'],
+        accounts: ['dashboard', 'tickets', 'expenses', 'reports'],
+        engineer: ['assets', 'tickets', 'attendance', 'expenses'],
       }[role] || ['tickets']
       if (!allowed.includes(tab)) setTab(allowed[0])
     }
@@ -131,16 +128,7 @@ export default function AmcApp({ session, onSignOut }) {
         return d !== null && d >= lo && d <= hi
       }).length
     const openTickets = tickets.filter((t) => t.status === 'Open' || t.status === 'In Progress').length
-    return {
-      customers: visibleCustomers.length,
-      active: active.length,
-      acv,
-      d30: bucket(0, 30),
-      d60: bucket(31, 60),
-      d90: bucket(61, 90),
-      assets: assets.length,
-      openTickets,
-    }
+    return { customers: visibleCustomers.length, active: active.length, acv, d30: bucket(0, 30), d60: bucket(31, 60), d90: bucket(61, 90), assets: assets.length, openTickets }
   }, [visibleContracts, visibleCustomers, tickets, assets])
 
   const renewalQueue = useMemo(
@@ -148,7 +136,7 @@ export default function AmcApp({ session, onSignOut }) {
       [...visibleContracts]
         .filter((c) => c.end_date && !c.closed)
         .sort((a, b) => (daysLeft(a.end_date) ?? 9999) - (daysLeft(b.end_date) ?? 9999))
-        .slice(0, 12),
+        .slice(0, 15),
     [visibleContracts]
   )
 
@@ -195,7 +183,7 @@ export default function AmcApp({ session, onSignOut }) {
     loadAll()
   }
   const closeContract = async (contract) => {
-    if (!window.confirm(`Close the ${contract.tier} contract? It will leave the renewal radar and revenue totals, but stays in records.`)) return
+    if (!window.confirm(`Close the ${contract.tier} contract? It leaves the radar and totals but stays in records.`)) return
     const { error } = await supabase.from('contracts').update({ closed: true }).eq('id', contract.id)
     if (error) return flash('Close failed: ' + error.message)
     flash('Contract closed')
@@ -211,29 +199,37 @@ export default function AmcApp({ session, onSignOut }) {
   const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
   const label = 'block text-xs font-medium text-slate-500 mb-1'
   const btn = 'px-4 py-2 rounded-md text-sm font-medium'
+  const link = 'text-xs text-indigo-700 hover:underline font-medium'
+
+  const act = (fn, text, tone) => (
+    <button onClick={fn} className={`text-xs ${tone || 'text-indigo-700'} hover:underline font-medium mr-2`}>
+      {text}
+    </button>
+  )
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="bg-slate-900 text-white">
-        <div className="max-w-6xl mx-auto px-4 py-5 flex flex-wrap items-center gap-4 justify-between">
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <header className="bg-slate-900 text-white border-b-4 border-indigo-600">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center gap-4 justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">AMC Command Center</h1>
-            <p className="text-slate-400 text-sm">India Digital Corporation · EasyGo Solutions</p>
+            <h1 className="text-lg font-semibold tracking-tight">AMC COMMAND CENTER</h1>
+            <p className="text-slate-400 text-xs">India Digital Corporation · EasyGo Solutions · ERP</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-emerald-400 h-4">{notice}</span>
-            <select value={filterVenture} onChange={(e) => setFilterVenture(e.target.value)}
-              className="bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm">
+            <select value={filterVenture} onChange={(e) => setFilterVenture(e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm">
               <option>All</option>
-              {VENTURES.map((v) => <option key={v}>{v}</option>)}
+              {VENTURES.map((v) => (
+                <option key={v}>{v}</option>
+              ))}
             </select>
-            <div className="text-right">
-              <p className="text-xs text-slate-400">{session.user.email}</p>
-              <button onClick={onSignOut} className="text-xs text-indigo-300 hover:text-white">Sign out</button>
+            <div className="text-right border-l border-slate-700 pl-3">
+              <p className="text-xs text-slate-300">{session.user.email}</p>
+              <p className="text-xs text-slate-500 uppercase">{role} · <button onClick={onSignOut} className="text-indigo-300 hover:text-white normal-case">Sign out</button></p>
             </div>
           </div>
         </div>
-        <nav className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
+        <nav className="max-w-7xl mx-auto px-4 flex gap-0.5 overflow-x-auto">
           {[
             ['dashboard', 'Dashboard', ['admin', 'accounts']],
             ['customers', 'Customers', ['admin']],
@@ -244,270 +240,174 @@ export default function AmcApp({ session, onSignOut }) {
             ['expenses', 'Expenses', ['admin', 'accounts', 'engineer']],
             ['reports', 'Reports', ['admin', 'accounts']],
             ['team', 'Team', ['admin']],
-          ].filter(([, , roles]) => roles.includes(role)).map(([k, t]) => (
-            <button key={k} onClick={() => setTab(k)}
-              className={`px-4 py-2 text-sm rounded-t-md whitespace-nowrap ${tab === k ? 'bg-slate-50 text-slate-900 font-medium' : 'text-slate-300 hover:text-white'}`}>
-              {t}
-            </button>
-          ))}
+          ]
+            .filter(([, , roles]) => roles.includes(role))
+            .map(([k, t]) => (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className={`px-4 py-2 text-sm whitespace-nowrap border-t border-l border-r rounded-t ${
+                  tab === k ? 'bg-slate-100 text-slate-900 font-semibold border-slate-300' : 'text-slate-300 border-transparent hover:text-white'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
         </nav>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-5 space-y-4">
         {loading ? (
           <p className="text-sm text-slate-500">Loading data…</p>
         ) : (
           <>
             {tab === 'dashboard' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-300 border border-slate-300 rounded-md overflow-hidden">
                   {[
-                    ['Customers', metrics.customers],
-                    ['Active AMCs', metrics.active],
-                    ['Annual contract value', inr(metrics.acv)],
-                    ['Open tickets', metrics.openTickets],
-                  ].map(([t, v]) => (
-                    <div key={t} className="bg-white rounded-lg border border-slate-200 p-4">
-                      <p className="text-xs text-slate-500">{t}</p>
-                      <p className="text-2xl font-semibold mt-1">{v}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {[
-                    ['Renew in 0–30 days', metrics.d30, 'text-red-600'],
-                    ['Renew in 31–60 days', metrics.d60, 'text-amber-600'],
-                    ['Renew in 61–90 days', metrics.d90, 'text-yellow-600'],
-                    ['Assets under management', metrics.assets, 'text-indigo-600'],
+                    ['Customers', metrics.customers, ''],
+                    ['Active AMCs', metrics.active, ''],
+                    ['Annual Contract Value', inr(metrics.acv), ''],
+                    ['Open Tickets', metrics.openTickets, metrics.openTickets > 0 ? 'text-red-600' : ''],
+                    ['Renew 0–30 days', metrics.d30, 'text-red-600'],
+                    ['Renew 31–60 days', metrics.d60, 'text-amber-600'],
+                    ['Renew 61–90 days', metrics.d90, 'text-yellow-600'],
+                    ['Assets Managed', metrics.assets, 'text-indigo-700'],
                   ].map(([t, v, tone]) => (
-                    <div key={t} className="bg-white rounded-lg border border-slate-200 p-4">
-                      <p className="text-xs text-slate-500">{t}</p>
-                      <p className={`text-2xl font-semibold mt-1 ${tone}`}>{v}</p>
+                    <div key={t} className="bg-white p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">{t}</p>
+                      <p className={`text-2xl font-semibold mt-1 tabular-nums ${tone}`}>{v}</p>
                     </div>
                   ))}
                 </div>
 
-                <section className="bg-white rounded-lg border border-slate-200">
-                  <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-                    <h2 className="font-medium">Renewal radar</h2>
-                    <span className="text-xs text-slate-400">Sorted by expiry — work top-down every Monday</span>
-                  </div>
-                  {renewalQueue.length === 0 ? (
-                    <p className="p-6 text-sm text-slate-500">No contracts yet.</p>
-                  ) : (
-                    <ul className="divide-y divide-slate-100">
-                      {renewalQueue.map((c) => {
-                        const cust = customersById[c.customer_id]
-                        const st = contractStatus(c)
-                        return (
-                          <li key={c.id} className="px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
-                            <div>
-                              <p className="text-sm font-medium">{cust ? cust.company : 'Unknown customer'}</p>
-                              <p className="text-xs text-slate-500">{c.tier} · {c.billing} · {inr(c.value)} · ends {c.end_date}</p>
-                              {c.scope && <p className="text-xs text-indigo-600 mt-0.5">📋 {c.scope}</p>}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {cust && <span className={`text-xs px-2 py-1 rounded-full ${ventureStyle[cust.venture]}`}>{cust.venture}</span>}
-                              <span className={`text-xs px-2 py-1 rounded-full ${st.tone}`}>{st.label}</span>
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                </section>
+                <SectionBar title="Renewal Radar" subtitle="Sorted by expiry — work top-down every Monday. Contract scope shown inline." />
+                <DataTable
+                  empty="No contracts yet."
+                  columns={[
+                    { key: 'company', label: 'Customer', render: (c) => <span className="font-medium">{customersById[c.customer_id]?.company || 'Unknown'}</span> },
+                    { key: 'venture', label: 'Venture', width: '90px', render: (c) => { const v = customersById[c.customer_id]?.venture; return v ? <span className={chip(ventureStyle[v])}>{v}</span> : '' } },
+                    { key: 'tier', label: 'Tier', width: '90px' },
+                    { key: 'scope', label: 'Contract Scope / Type', render: (c) => <span className="text-slate-600">{c.scope || <span className="text-slate-300">—</span>}</span> },
+                    { key: 'value', label: 'Value', align: 'right', width: '110px', render: (c) => inr(c.value) },
+                    { key: 'billing', label: 'Billing', width: '100px' },
+                    { key: 'end_date', label: 'Ends', width: '110px' },
+                    { key: 'status', label: 'Status', width: '160px', render: (c) => { const s = contractStatus(c); return <span className={chip(s.tone)}>{s.label}</span> } },
+                  ]}
+                  rows={renewalQueue}
+                />
               </div>
             )}
 
             {tab === 'customers' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-medium">Customers ({visibleCustomers.length})</h2>
-                  <button onClick={() => setCustForm({ ...emptyCustomer })} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>
-                    Add customer
-                  </button>
-                </div>
+                <SectionBar title={`Customers (${visibleCustomers.length})`} subtitle="Master list of AMC clients across both ventures">
+                  <button onClick={() => setCustForm({ ...emptyCustomer })} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>+ Add customer</button>
+                </SectionBar>
+
                 {custForm && (
-                  <div className="bg-white border border-indigo-200 rounded-lg p-4 grid md:grid-cols-3 gap-3">
-                    <div>
-                      <span className={label}>Venture</span>
-                      <select className={input} value={custForm.venture} onChange={(e) => setCustForm({ ...custForm, venture: e.target.value })}>
-                        {VENTURES.map((v) => <option key={v}>{v}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <span className={label}>Company *</span>
-                      <input className={input} value={custForm.company} onChange={(e) => setCustForm({ ...custForm, company: e.target.value })} />
-                    </div>
-                    <div>
-                      <span className={label}>Segment</span>
-                      <select className={input} value={custForm.segment} onChange={(e) => setCustForm({ ...custForm, segment: e.target.value })}>
-                        {SEGMENTS.map((s) => <option key={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <span className={label}>Contact person</span>
-                      <input className={input} value={custForm.contact || ''} onChange={(e) => setCustForm({ ...custForm, contact: e.target.value })} />
-                    </div>
-                    <div>
-                      <span className={label}>Phone</span>
-                      <input className={input} value={custForm.phone || ''} onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })} />
-                    </div>
-                    <div>
-                      <span className={label}>Email</span>
-                      <input className={input} value={custForm.email || ''} onChange={(e) => setCustForm({ ...custForm, email: e.target.value })} />
-                    </div>
-                    <div className="md:col-span-3">
-                      <span className={label}>Notes</span>
-                      <textarea className={input} rows={2} value={custForm.notes || ''} onChange={(e) => setCustForm({ ...custForm, notes: e.target.value })} />
-                    </div>
+                  <div className="bg-white border border-indigo-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
+                    <div><span className={label}>Venture</span>
+                      <select className={input} value={custForm.venture} onChange={(e) => setCustForm({ ...custForm, venture: e.target.value })}>{VENTURES.map((v) => <option key={v}>{v}</option>)}</select></div>
+                    <div><span className={label}>Company *</span>
+                      <input className={input} value={custForm.company} onChange={(e) => setCustForm({ ...custForm, company: e.target.value })} /></div>
+                    <div><span className={label}>Segment</span>
+                      <select className={input} value={custForm.segment} onChange={(e) => setCustForm({ ...custForm, segment: e.target.value })}>{SEGMENTS.map((s) => <option key={s}>{s}</option>)}</select></div>
+                    <div><span className={label}>Contact person</span>
+                      <input className={input} value={custForm.contact || ''} onChange={(e) => setCustForm({ ...custForm, contact: e.target.value })} /></div>
+                    <div><span className={label}>Phone</span>
+                      <input className={input} value={custForm.phone || ''} onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })} /></div>
+                    <div><span className={label}>Email</span>
+                      <input className={input} value={custForm.email || ''} onChange={(e) => setCustForm({ ...custForm, email: e.target.value })} /></div>
+                    <div className="md:col-span-3"><span className={label}>Notes</span>
+                      <textarea className={input} rows={2} value={custForm.notes || ''} onChange={(e) => setCustForm({ ...custForm, notes: e.target.value })} /></div>
                     <div className="md:col-span-3 flex gap-2">
-                      <button onClick={saveCustomer} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save customer</button>
+                      <button onClick={saveCustomer} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save</button>
                       <button onClick={() => setCustForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
                     </div>
                   </div>
                 )}
-                <div className="bg-white rounded-lg border border-slate-200">
-                  {visibleCustomers.length === 0 ? (
-                    <p className="p-6 text-sm text-slate-500">No customers yet.</p>
-                  ) : (
-                    <ul className="divide-y divide-slate-100">
-                      {visibleCustomers.map((c) => (
-                        <li key={c.id} className="px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
-                          <div>
-                            <p className="text-sm font-medium">
-                              {c.company} <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${ventureStyle[c.venture]}`}>{c.venture}</span>
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {c.segment}{c.contact ? ` · ${c.contact}` : ''}{c.phone ? ` · ${c.phone}` : ''}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => setCustForm({ ...c })} className="text-xs text-indigo-600 hover:underline">Edit</button>
-                            <button onClick={() => deleteCustomer(c.id)} className="text-xs text-red-500 hover:underline">Delete</button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+
+                <DataTable
+                  empty="No customers yet — add every AMC client, even informal ones."
+                  columns={[
+                    { key: 'company', label: 'Company', render: (c) => <span className="font-medium">{c.company}</span> },
+                    { key: 'venture', label: 'Venture', width: '90px', render: (c) => <span className={chip(ventureStyle[c.venture])}>{c.venture}</span> },
+                    { key: 'segment', label: 'Segment', width: '160px' },
+                    { key: 'contact', label: 'Contact Person', width: '150px' },
+                    { key: 'phone', label: 'Phone', width: '120px' },
+                    { key: 'email', label: 'Email' },
+                    { key: 'notes', label: 'Notes', render: (c) => <span className="text-slate-500">{c.notes}</span> },
+                    { key: 'act', label: 'Actions', width: '120px', render: (c) => (<span>{act(() => setCustForm({ ...c }), 'Edit')}{act(() => deleteCustomer(c.id), 'Delete', 'text-red-600')}</span>) },
+                  ]}
+                  rows={visibleCustomers}
+                />
               </div>
             )}
 
             {tab === 'contracts' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-medium">AMC Contracts ({visibleContracts.length})</h2>
-                  <button onClick={() => setConForm({ ...emptyContract })}
-                    className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50`} disabled={customers.length === 0}>
-                    Add contract
-                  </button>
-                </div>
+                <SectionBar title={`AMC Contracts (${visibleContracts.length})`} subtitle="Close (not delete) contracts that end — history stays for renewals and audits">
+                  <button onClick={() => setConForm({ ...emptyContract })} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50`} disabled={customers.length === 0}>+ Add contract</button>
+                </SectionBar>
+
                 {conForm && (
-                  <div className="bg-white border border-indigo-200 rounded-lg p-4 grid md:grid-cols-3 gap-3">
-                    <div>
-                      <span className={label}>Customer *</span>
+                  <div className="bg-white border border-indigo-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
+                    <div><span className={label}>Customer *</span>
                       <select className={input} value={conForm.customer_id} onChange={(e) => setConForm({ ...conForm, customer_id: e.target.value })}>
                         <option value="">Select…</option>
                         {customers.map((c) => <option key={c.id} value={c.id}>{c.company} ({c.venture})</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <span className={label}>Tier</span>
-                      <select className={input} value={conForm.tier} onChange={(e) => setConForm({ ...conForm, tier: e.target.value })}>
-                        {TIERS.map((t) => <option key={t}>{t}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <span className={label}>Value per billing cycle (₹)</span>
-                      <input type="number" className={input} value={conForm.value} onChange={(e) => setConForm({ ...conForm, value: e.target.value })} />
-                    </div>
-                    <div>
-                      <span className={label}>Billing cycle</span>
-                      <select className={input} value={conForm.billing} onChange={(e) => setConForm({ ...conForm, billing: e.target.value })}>
-                        {BILLING.map((b) => <option key={b}>{b}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <span className={label}>Start date</span>
-                      <input type="date" className={input} value={conForm.start_date || ''} onChange={(e) => setConForm({ ...conForm, start_date: e.target.value })} />
-                    </div>
-                    <div>
-                      <span className={label}>End date *</span>
-                      <input type="date" className={input} value={conForm.end_date || ''} onChange={(e) => setConForm({ ...conForm, end_date: e.target.value })} />
-                    </div>
-                    <div className="md:col-span-3">
-                      <span className={label}>Scope</span>
-                      <textarea className={input} rows={2} value={conForm.scope || ''} onChange={(e) => setConForm({ ...conForm, scope: e.target.value })} />
-                    </div>
+                      </select></div>
+                    <div><span className={label}>Tier</span>
+                      <select className={input} value={conForm.tier} onChange={(e) => setConForm({ ...conForm, tier: e.target.value })}>{TIERS.map((t) => <option key={t}>{t}</option>)}</select></div>
+                    <div><span className={label}>Value per billing cycle (₹)</span>
+                      <input type="number" className={input} value={conForm.value} onChange={(e) => setConForm({ ...conForm, value: e.target.value })} /></div>
+                    <div><span className={label}>Billing cycle</span>
+                      <select className={input} value={conForm.billing} onChange={(e) => setConForm({ ...conForm, billing: e.target.value })}>{BILLING.map((b) => <option key={b}>{b}</option>)}</select></div>
+                    <div><span className={label}>Start date</span>
+                      <input type="date" className={input} value={conForm.start_date || ''} onChange={(e) => setConForm({ ...conForm, start_date: e.target.value })} /></div>
+                    <div><span className={label}>End date *</span>
+                      <input type="date" className={input} value={conForm.end_date || ''} onChange={(e) => setConForm({ ...conForm, end_date: e.target.value })} /></div>
+                    <div className="md:col-span-3"><span className={label}>Scope / contract type (shown on the renewal radar)</span>
+                      <textarea className={input} rows={2} value={conForm.scope || ''} onChange={(e) => setConForm({ ...conForm, scope: e.target.value })} placeholder="e.g. 25 desktops + 2 servers + CCTV · 24hr response SLA" /></div>
                     <div className="md:col-span-3 flex gap-2">
-                      <button onClick={saveContract} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save contract</button>
+                      <button onClick={saveContract} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save</button>
                       <button onClick={() => setConForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
                     </div>
                   </div>
                 )}
-                <div className="bg-white rounded-lg border border-slate-200">
-                  {visibleContracts.length === 0 ? (
-                    <p className="p-6 text-sm text-slate-500">No contracts recorded yet.</p>
-                  ) : (
-                    <ul className="divide-y divide-slate-100">
-                      {visibleContracts.map((c) => {
-                        const cust = customersById[c.customer_id]
-                        const st = contractStatus(c)
-                        return (
-                          <li key={c.id} className="px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
-                            <div>
-                              <p className="text-sm font-medium">{cust ? cust.company : 'Unknown'} — {c.tier}</p>
-                              <p className="text-xs text-slate-500">{inr(c.value)} / {c.billing} · {c.start_date || '?'} → {c.end_date}</p>
-                              {c.scope && <p className="text-xs text-slate-400 mt-0.5">{c.scope}</p>}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs px-2 py-1 rounded-full ${st.tone}`}>{st.label}</span>
-                              <button onClick={() => setConForm({ ...c })} className="text-xs text-indigo-600 hover:underline">Edit</button>
-                              {!c.closed ? (
-                                <button onClick={() => closeContract(c)} className="text-xs text-amber-600 hover:underline">Close</button>
-                              ) : (
-                                <button onClick={() => reopenContract(c)} className="text-xs text-emerald-600 hover:underline">Reopen</button>
-                              )}
-                              <button onClick={() => deleteContract(c.id)} className="text-xs text-red-500 hover:underline">Delete</button>
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                </div>
+
+                <DataTable
+                  empty="No contracts recorded yet."
+                  columns={[
+                    { key: 'company', label: 'Customer', render: (c) => <span className="font-medium">{customersById[c.customer_id]?.company || 'Unknown'}</span> },
+                    { key: 'tier', label: 'Tier', width: '90px' },
+                    { key: 'value', label: 'Value', align: 'right', width: '110px', render: (c) => inr(c.value) },
+                    { key: 'billing', label: 'Billing', width: '100px' },
+                    { key: 'start_date', label: 'Start', width: '105px' },
+                    { key: 'end_date', label: 'End', width: '105px' },
+                    { key: 'scope', label: 'Scope / Type', render: (c) => <span className="text-slate-600">{c.scope}</span> },
+                    { key: 'status', label: 'Status', width: '150px', render: (c) => { const s = contractStatus(c); return <span className={chip(s.tone)}>{s.label}</span> } },
+                    { key: 'act', label: 'Actions', width: '170px', render: (c) => (
+                      <span>
+                        {act(() => setConForm({ ...c }), 'Edit')}
+                        {!c.closed ? act(() => closeContract(c), 'Close', 'text-amber-600') : act(() => reopenContract(c), 'Reopen', 'text-emerald-600')}
+                        {act(() => deleteContract(c.id), 'Delete', 'text-red-600')}
+                      </span>
+                    ) },
+                  ]}
+                  rows={visibleContracts}
+                />
               </div>
             )}
 
-            {tab === 'assets' && (
-              <AssetsTab customers={customers} assets={assets} reload={loadAll} flash={flash} />
-            )}
-            {tab === 'tickets' && (
-              <TicketsTab customers={customers} assets={assets} tickets={tickets} reload={loadAll} flash={flash} session={session} />
-            )}
-            {tab === 'attendance' && (
-              <AttendanceTab customers={customers} attendance={attendance} reload={loadAll} flash={flash} session={session} />
-            )}
-            {tab === 'expenses' && (
-              <ExpensesTab customers={customers} expenses={expenses} reload={loadAll} flash={flash} session={session} role={role} />
-            )}
-            {tab === 'team' && role === 'admin' && (
-              <TeamTab staff={staff} reload={loadAll} flash={flash} session={session} />
-            )}
-
+            {tab === 'assets' && <AssetsTab customers={customers} assets={assets} reload={loadAll} flash={flash} />}
+            {tab === 'tickets' && <TicketsTab customers={customers} assets={assets} tickets={tickets} reload={loadAll} flash={flash} session={session} />}
+            {tab === 'attendance' && <AttendanceTab customers={customers} attendance={attendance} reload={loadAll} flash={flash} session={session} />}
+            {tab === 'expenses' && <ExpensesTab customers={customers} expenses={expenses} reload={loadAll} flash={flash} session={session} role={role} />}
+            {tab === 'team' && role === 'admin' && <TeamTab staff={staff} reload={loadAll} flash={flash} session={session} />}
             {tab === 'reports' && (
-              <ReportsTab
-                customers={customers}
-                contracts={contracts}
-                assets={assets}
-                tickets={tickets}
-                reports={reports}
-                attendance={attendance}
-                expenses={expenses}
-                feedback={feedback}
-                flash={flash}
-              />
+              <ReportsTab customers={customers} contracts={contracts} assets={assets} tickets={tickets} reports={reports} attendance={attendance} expenses={expenses} feedback={feedback} flash={flash} />
             )}
           </>
         )}

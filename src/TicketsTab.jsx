@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { TICKET_PRIORITIES, TICKET_STATUSES } from './checklists'
+import { DataTable, chip } from './ui'
 
 const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const label = 'block text-xs font-medium text-slate-500 mb-1'
@@ -159,51 +160,27 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
         </div>
       )}
 
-      <div className="bg-white rounded-lg border border-slate-200">
-        {visible.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No open tickets. New complaints from customers get logged here and assigned to engineers.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {visible.map((t) => {
-              const cust = customersById[t.customer_id]
-              const asset = t.asset_id ? assetsById[t.asset_id] : null
-              return (
-                <li key={t.id} className="px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{t.title}</p>
-                    <p className="text-xs text-slate-500">
-                      {cust ? cust.company : 'Unknown'}
-                      {asset ? ` · ${asset.asset_code}` : ''}
-                      {t.assigned_to ? ` · ${t.assigned_to}` : ' · Unassigned'}
-                      {t.created_at ? ` · ${String(t.created_at).slice(0, 10)}` : ''}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs px-2 py-1 rounded-full ${prioTone[t.priority] || ''}`}>{t.priority}</span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${statusTone[t.status] || ''}`}>{t.status}</span>
-                    {t.status === 'Open' && (
-                      <button onClick={() => quickStatus(t, 'In Progress')} className="text-xs text-indigo-600 hover:underline">
-                        Start
-                      </button>
-                    )}
-                    {(t.status === 'Open' || t.status === 'In Progress') && (
-                      <button onClick={() => quickStatus(t, 'Resolved')} className="text-xs text-emerald-600 hover:underline">
-                        Resolve
-                      </button>
-                    )}
-                    <button onClick={() => setForm({ ...t })} className="text-xs text-indigo-600 hover:underline">
-                      Edit
-                    </button>
-                    <button onClick={() => remove(t.id)} className="text-xs text-red-500 hover:underline">
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
+      <DataTable
+        empty="No open tickets. Customer complaints get logged here and assigned to engineers."
+        columns={[
+          { key: 'created_at', label: 'Date', width: '100px', render: (t) => String(t.created_at || '').slice(0, 10) },
+          { key: 'company', label: 'Customer', render: (t) => <span className="font-medium">{customersById[t.customer_id]?.company || 'Unknown'}</span> },
+          { key: 'asset', label: 'Asset', width: '100px', render: (t) => t.asset_id ? <span className="font-mono text-xs">{assetsById[t.asset_id]?.asset_code}</span> : '' },
+          { key: 'title', label: 'Issue', render: (t) => (<span>{t.title}{t.description && <span className="block text-xs text-slate-500 mt-0.5">{t.description}</span>}</span>) },
+          { key: 'assigned_to', label: 'Assigned To', width: '150px', render: (t) => t.assigned_to || <span className="text-slate-400">Unassigned</span> },
+          { key: 'priority', label: 'Priority', width: '90px', render: (t) => <span className={chip(prioTone[t.priority] || '')}>{t.priority}</span> },
+          { key: 'status', label: 'Status', width: '110px', render: (t) => <span className={chip(statusTone[t.status] || '')}>{t.status}</span> },
+          { key: 'act', label: 'Actions', width: '190px', render: (t) => (
+            <span className="text-xs font-medium">
+              {t.status === 'Open' && <button onClick={() => quickStatus(t, 'In Progress')} className="text-indigo-700 hover:underline mr-2">Start</button>}
+              {(t.status === 'Open' || t.status === 'In Progress') && <button onClick={() => quickStatus(t, 'Resolved')} className="text-emerald-700 hover:underline mr-2">Resolve</button>}
+              <button onClick={() => setForm({ ...t })} className="text-indigo-700 hover:underline mr-2">Edit</button>
+              <button onClick={() => remove(t.id)} className="text-red-600 hover:underline">Delete</button>
+            </span>
+          ) },
+        ]}
+        rows={visible}
+      />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { supabase } from './supabase'
+import { DataTable, chip } from './ui'
 
 const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const label = 'block text-xs font-medium text-slate-500 mb-1'
@@ -164,59 +165,38 @@ export default function ExpensesTab({ customers, expenses, reload, flash, sessio
         </div>
       )}
 
-      <div className="bg-white rounded-lg border border-slate-200">
-        {visible.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">
-            No expenses yet. Engineers add travel expenses here; they go to management for approval, then accounts marks them paid.
-          </p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {visible.map((e) => (
-              <li key={e.id} className="px-4 py-3 flex flex-wrap items-center gap-3 justify-between text-sm">
-                <div>
-                  <p className="font-medium">
-                    {inr(e.amount)} — {e.travel_mode} {e.from_location ? `· ${e.from_location} → ${e.to_location || '?'}` : ''}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {e.date} · {e.engineer}
-                    {e.customer_id && customersById[e.customer_id] ? ` · ${customersById[e.customer_id].company}` : ''}
-                    {e.approved_by ? ` · ${e.status === 'Rejected' ? 'rejected' : 'approved'} by ${e.approved_by}` : ''}
-                  </p>
-                  {e.notes && <p className="text-xs text-slate-400 mt-0.5">{e.notes}</p>}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs px-2 py-1 rounded-full ${statusTone[e.status] || ''}`}>{e.status}</span>
-                  {isMgmt && e.status === 'Pending' && (
-                    <>
-                      <button onClick={() => setStatus(e, 'Approved')} className="text-xs text-emerald-600 hover:underline">
-                        Approve
-                      </button>
-                      <button onClick={() => setStatus(e, 'Rejected')} className="text-xs text-red-500 hover:underline">
-                        Reject
-                      </button>
-                    </>
-                  )}
-                  {isMgmt && e.status === 'Approved' && (
-                    <button onClick={() => setStatus(e, 'Paid')} className="text-xs text-emerald-700 hover:underline">
-                      Mark paid
-                    </button>
-                  )}
-                  {(e.engineer === me && e.status === 'Pending') && (
-                    <button onClick={() => setForm({ ...e })} className="text-xs text-indigo-600 hover:underline">
-                      Edit
-                    </button>
-                  )}
-                  {(role === 'admin' || (e.engineer === me && e.status === 'Pending')) && (
-                    <button onClick={() => remove(e.id)} className="text-xs text-red-500 hover:underline">
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <DataTable
+        empty="No expenses yet. Engineers submit travel expenses; management approves; accounts marks paid."
+        footer={
+          <>
+            <td className="px-3 py-2 text-xs uppercase text-slate-600" colSpan={5}>Total (filtered)</td>
+            <td className="px-3 py-2 text-right tabular-nums">{inr(totalVisible)}</td>
+            <td colSpan={3}></td>
+          </>
+        }
+        columns={[
+          { key: 'date', label: 'Date', width: '100px' },
+          { key: 'engineer', label: 'Engineer', width: '170px', render: (e) => <span className="text-xs">{e.engineer}</span> },
+          { key: 'route', label: 'From → To', render: (e) => `${e.from_location || ''}${e.to_location ? ' → ' + e.to_location : ''}` },
+          { key: 'travel_mode', label: 'Mode', width: '110px' },
+          { key: 'company', label: 'Customer', render: (e) => e.customer_id ? customersById[e.customer_id]?.company || '' : '' },
+          { key: 'amount', label: 'Amount', align: 'right', width: '100px', render: (e) => inr(e.amount) },
+          { key: 'status', label: 'Status', width: '100px', render: (e) => <span className={chip(statusTone[e.status] || '')}>{e.status}</span> },
+          { key: 'approved_by', label: 'Approved By', width: '150px', render: (e) => <span className="text-xs">{e.approved_by || ''}</span> },
+          { key: 'act', label: 'Actions', width: '190px', render: (e) => (
+            <span className="text-xs font-medium">
+              {isMgmt && e.status === 'Pending' && (<>
+                <button onClick={() => setStatus(e, 'Approved')} className="text-emerald-700 hover:underline mr-2">Approve</button>
+                <button onClick={() => setStatus(e, 'Rejected')} className="text-red-600 hover:underline mr-2">Reject</button>
+              </>)}
+              {isMgmt && e.status === 'Approved' && <button onClick={() => setStatus(e, 'Paid')} className="text-emerald-700 hover:underline mr-2">Mark paid</button>}
+              {e.engineer === me && e.status === 'Pending' && <button onClick={() => setForm({ ...e })} className="text-indigo-700 hover:underline mr-2">Edit</button>}
+              {(role === 'admin' || (e.engineer === me && e.status === 'Pending')) && <button onClick={() => remove(e.id)} className="text-red-600 hover:underline">Delete</button>}
+            </span>
+          ) },
+        ]}
+        rows={visible}
+      />
     </div>
   )
 }

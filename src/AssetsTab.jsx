@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { supabase } from './supabase'
 import { DEVICE_TYPE_LIST } from './checklists'
+import { DataTable, SectionBar } from './ui'
 
 const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const label = 'block text-xs font-medium text-slate-500 mb-1'
@@ -172,47 +173,26 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
         </div>
       )}
 
-      <div className="bg-white rounded-lg border border-slate-200">
-        {visible.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">
-            No assets yet. Register every customer device here — each gets a unique code and a printable QR label. Stick the label on the machine; engineers scan it on site to see AMC status and file the service report.
-          </p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {visible.map((a) => {
-              const cust = customersById[a.customer_id]
-              return (
-                <li key={a.id} className="px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
-                  <div>
-                    <p className="text-sm font-medium">
-                      <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-indigo-700">{a.asset_code}</span>{' '}
-                      {a.device_type} {a.brand ? `· ${a.brand}` : ''} {a.model || ''}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {cust ? cust.company : 'Unknown'} · S/N {a.serial_number}
-                      {a.location ? ` · ${a.location}` : ''}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <a href={`#/asset/${a.asset_code}`} className="text-xs text-emerald-700 hover:underline">
-                      Open
-                    </a>
-                    <button onClick={() => printLabel(a)} className="text-xs text-indigo-600 hover:underline">
-                      Print QR label
-                    </button>
-                    <button onClick={() => setForm({ ...a })} className="text-xs text-indigo-600 hover:underline">
-                      Edit
-                    </button>
-                    <button onClick={() => remove(a.id)} className="text-xs text-red-500 hover:underline">
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
+      <DataTable
+        empty="No assets yet. Register every customer device — each gets a unique code and a printable QR label."
+        columns={[
+          { key: 'asset_code', label: 'Asset Code', width: '110px', render: (a) => <span className="font-mono font-semibold text-indigo-700">{a.asset_code}</span> },
+          { key: 'company', label: 'Customer', render: (a) => customersById[a.customer_id]?.company || 'Unknown' },
+          { key: 'device_type', label: 'Device Type', width: '170px' },
+          { key: 'brand', label: 'Brand / Model', render: (a) => `${a.brand || ''} ${a.model || ''}`.trim() },
+          { key: 'serial_number', label: 'Serial No.', width: '150px', render: (a) => <span className="font-mono text-xs">{a.serial_number}</span> },
+          { key: 'location', label: 'Location', render: (a) => <span className="text-slate-600">{a.location}</span> },
+          { key: 'act', label: 'Actions', width: '220px', render: (a) => (
+            <span className="text-xs font-medium">
+              <a href={`#/asset/${a.asset_code}`} className="text-emerald-700 hover:underline mr-2">Open</a>
+              <button onClick={() => printLabel(a)} className="text-indigo-700 hover:underline mr-2">QR label</button>
+              <button onClick={() => setForm({ ...a })} className="text-indigo-700 hover:underline mr-2">Edit</button>
+              <button onClick={() => remove(a.id)} className="text-red-600 hover:underline">Delete</button>
+            </span>
+          ) },
+        ]}
+        rows={visible}
+      />
     </div>
   )
 }
