@@ -23,7 +23,8 @@ const statusTone = {
 
 const emptyTicket = { customer_id: '', asset_id: '', title: '', description: '', priority: 'Medium', status: 'Open', assigned_to: '' }
 
-export default function TicketsTab({ customers, assets, tickets, reload, flash, session }) {
+export default function TicketsTab({ customers, assets, tickets, reload, flash, session, role }) {
+  const isMgmt = role === 'admin' || role === 'accounts'
   const [form, setForm] = useState(null)
   const [showClosed, setShowClosed] = useState(false)
 
@@ -62,10 +63,27 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
   }
 
   const quickStatus = async (t, status) => {
-    const { error } = await supabase.from('tickets').update({ status }).eq('id', t.id)
+    const patch = { status }
+    if (status === 'Resolved') {
+      patch.resolved_by = session.user.email
+      patch.resolved_at = new Date().toISOString()
+    }
+    const { error } = await supabase.from('tickets').update(patch).eq('id', t.id)
     if (error) return flash('Update failed: ' + error.message)
     reload()
   }
+
+  const toggleRepeat = async (t) => {
+    const { error } = await supabase.from('tickets').update({
+      repeat_call: !t.repeat_call,
+      repeat_marked_by: !t.repeat_call ? session.user.email : null,
+    }).eq('id', t.id)
+    if (error) return flash('Update failed: ' + error.message)
+    flash(!t.repeat_call ? 'Marked as repeat call' : 'Repeat mark removed')
+    reload()
+  }
+
+  const fmtDT = (ts) => ts ? new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
 
   const remove = async (id) => {
     if (!window.confirm('Delete this ticket?')) return
@@ -163,17 +181,24 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
       <DataTable
         empty="No open tickets. Customer complaints get logged here and assigned to engineers."
         columns={[
-          { key: 'created_at', label: 'Date', width: '100px', render: (t) => String(t.created_at || '').slice(0, 10) },
+          { key: 'created_at', label: 'Raised', width: '130px', render: (t) => <span className="text-xs">{fmtDT(t.created_at)}</span> },
           { key: 'company', label: 'Customer', render: (t) => <span className="font-medium">{customersById[t.customer_id]?.company || 'Unknown'}</span> },
           { key: 'asset', label: 'Asset', width: '100px', render: (t) => t.asset_id ? <span className="font-mono text-xs">{assetsById[t.asset_id]?.asset_code}</span> : '' },
           { key: 'title', label: 'Issue', render: (t) => (<span>{t.title}{t.description && <span className="block text-xs text-slate-500 mt-0.5">{t.description}</span>}</span>) },
           { key: 'assigned_to', label: 'Assigned To', width: '150px', render: (t) => t.assigned_to || <span className="text-slate-400">Unassigned</span> },
           { key: 'priority', label: 'Priority', width: '90px', render: (t) => <span className={chip(prioTone[t.priority] || '')}>{t.priority}</span> },
-          { key: 'status', label: 'Status', width: '110px', render: (t) => <span className={chip(statusTone[t.status] || '')}>{t.status}</span> },
+          { key: 'status', label: 'Status', width: '110px', render: (t) => (
+            <span>
+              <span className={chip(statusTone[t.status] || '')}>{t.status}</span>
+              {t.repeat_call && <span className="block mt-1"><span className={chip('bg-purple-100 text-purple-700')}>REPEAT</span></span>}
+            </span>
+          ) },
+          { key: 'resolved', label: 'Resolved By', width: '150px', render: (t) => t.resolved_by ? (<span className="text-xs">{t.resolved_by}<span className="block text-slate-400">{fmtDT(t.resolved_at)}</span></span>) : '' },
           { key: 'act', label: 'Actions', width: '190px', render: (t) => (
             <span className="text-xs font-medium">
               {t.status === 'Open' && <button onClick={() => quickStatus(t, 'In Progress')} className="text-indigo-700 hover:underline mr-2">Start</button>}
               {(t.status === 'Open' || t.status === 'In Progress') && <button onClick={() => quickStatus(t, 'Resolved')} className="text-emerald-700 hover:underline mr-2">Resolve</button>}
+              {isMgmt && <button onClick={() => toggleRepeat(t)} className="text-purple-700 hover:underline mr-2">{t.repeat_call ? 'Un-repeat' : 'Mark repeat'}</button>}
               <button onClick={() => setForm({ ...t })} className="text-indigo-700 hover:underline mr-2">Edit</button>
               <button onClick={() => remove(t.id)} className="text-red-600 hover:underline">Delete</button>
             </span>

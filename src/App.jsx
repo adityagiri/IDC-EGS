@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import AmcApp from './AmcApp'
 import AssetPage from './AssetPage'
 import FeedbackPage from './FeedbackPage'
+import CustomerPortal from './CustomerPortal'
 
 const parseHash = () => {
   const h = window.location.hash || ''
@@ -75,6 +76,44 @@ export default function App() {
           </button>
           <p className="text-xs text-slate-400 mt-4">Accounts are created by the administrator. Contact Santosh if you need access.</p>
         </form>
+      </div>
+    )
+
+  return <Gate session={session} route={route} />
+}
+
+// Decides whether the logged-in user is staff or a customer
+function Gate({ session, route }) {
+  const [state, setState] = useState({ loading: true, kind: null, customer: null })
+
+  useEffect(() => {
+    ;(async () => {
+      const email = session.user.email
+      const { data: staff } = await supabase.from('staff_roles').select('email')
+      const isStaff = (staff || []).some((s) => s.email.toLowerCase() === email.toLowerCase()) || (staff || []).length === 0
+      if (isStaff) return setState({ loading: false, kind: 'staff', customer: null })
+      const { data: cust } = await supabase.from('customers').select('*').ilike('email', email).maybeSingle()
+      if (cust) return setState({ loading: false, kind: 'customer', customer: cust })
+      setState({ loading: false, kind: 'none', customer: null })
+    })()
+  }, [session])
+
+  if (state.loading)
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">Checking access…</div>
+
+  if (state.kind === 'customer')
+    return <CustomerPortal customer={state.customer} session={session} onSignOut={() => supabase.auth.signOut()} />
+
+  if (state.kind === 'none')
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-8 text-center">
+          <p className="text-lg font-semibold text-slate-800">No access configured</p>
+          <p className="text-sm text-slate-500 mt-2">
+            Your login exists but is not linked to a staff role or a customer account. Please contact the administrator.
+          </p>
+          <button onClick={() => supabase.auth.signOut()} className="mt-4 text-sm text-indigo-600 hover:underline">Sign out</button>
+        </div>
       </div>
     )
 

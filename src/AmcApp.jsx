@@ -402,7 +402,7 @@ export default function AmcApp({ session, onSignOut }) {
             )}
 
             {tab === 'assets' && <AssetsTab customers={customers} assets={assets} reload={loadAll} flash={flash} />}
-            {tab === 'tickets' && <TicketsTab customers={customers} assets={assets} tickets={tickets} reload={loadAll} flash={flash} session={session} />}
+            {tab === 'tickets' && <TicketsTab customers={customers} assets={assets} tickets={tickets} reload={loadAll} flash={flash} session={session} role={role} />}
             {tab === 'attendance' && <AttendanceTab customers={customers} attendance={attendance} reload={loadAll} flash={flash} session={session} />}
             {tab === 'expenses' && <ExpensesTab customers={customers} expenses={expenses} reload={loadAll} flash={flash} session={session} role={role} />}
             {tab === 'team' && role === 'admin' && <TeamTab staff={staff} reload={loadAll} flash={flash} session={session} />}

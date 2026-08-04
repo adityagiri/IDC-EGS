@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
+import { DataTable } from './ui'
 
 const btn = 'px-4 py-2 rounded-md text-sm font-medium'
+const fmtDT = (ts) => (ts ? new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
 
 const download = (sheets, filename) => {
@@ -42,7 +44,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
     const map = {}
     const get = (name) => {
       if (!name) name = 'Unassigned'
-      if (!map[name]) map[name] = { Engineer: name, 'Tickets handled': 0, 'Tickets resolved': 0, 'Repeat calls': 0, 'Service reports': 0, 'Site visits': 0, 'Minutes on site': 0 }
+      if (!map[name]) map[name] = { Engineer: name, 'Tickets handled': 0, 'Tickets resolved': 0, 'Repeat calls (marked)': 0, 'Repeat calls (auto)': 0, 'Service reports': 0, 'Site visits': 0, 'Minutes on site': 0 }
       return map[name]
     }
     const filteredTickets = tickets.filter((t) => inMonth(t.created_at))
@@ -50,6 +52,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
       const row = get(t.assigned_to)
       row['Tickets handled']++
       if (t.status === 'Resolved' || t.status === 'Closed') row['Tickets resolved']++
+      if (t.repeat_call) row['Repeat calls (marked)']++
     })
     // repeat call: another ticket on the same asset within 30 days before this one
     filteredTickets.forEach((t) => {
@@ -57,7 +60,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
       const earlier = tickets.find(
         (o) => o.id !== t.id && o.asset_id === t.asset_id && new Date(t.created_at) - new Date(o.created_at) > 0 && new Date(t.created_at) - new Date(o.created_at) < 30 * 86400000
       )
-      if (earlier) get(t.assigned_to)['Repeat calls']++
+      if (earlier) get(t.assigned_to)['Repeat calls (auto)']++
     })
     reports.filter((r) => inMonth(r.date)).forEach((r) => get(r.engineer)['Service reports']++)
     attendance.filter((a) => inMonth(a.check_in)).forEach((a) => {
@@ -67,6 +70,29 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
     })
     return Object.values(map)
   }, [tickets, reports, attendance, month])
+
+  // Detailed ticket register with full date-time audit trail
+  const ticketRows = useMemo(
+    () =>
+      tickets
+        .filter((t) => inMonth(t.created_at))
+        .map((t) => ({
+          'Raised (date-time)': fmtDT(t.created_at),
+          Company: customersById[t.customer_id]?.company || 'Unknown',
+          Asset: t.asset_id ? assetsById[t.asset_id]?.asset_code || '' : '',
+          Issue: t.title,
+          Details: t.description || '',
+          Priority: t.priority,
+          Status: t.status,
+          'Raised by': t.created_by || '',
+          'Assigned engineer': t.assigned_to || '',
+          'Resolved by': t.resolved_by || '',
+          'Resolved (date-time)': fmtDT(t.resolved_at),
+          'Repeat call': t.repeat_call ? 'YES' : '',
+          'Repeat marked by': t.repeat_marked_by || '',
+        })),
+    [tickets, customersById, assetsById, month]
+  )
 
   // ---------- Report 2: Company-wise tickets ----------
   const companyTickets = useMemo(() => {
@@ -132,16 +158,42 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
     [contracts, customersById]
   )
 
-  // ---------- Report 5: Full export ----------
+  // ---------- Service reports register (who scanned & serviced what, when) ----------
+  const serviceRows = useMemo(
+    () =>
+      reports
+        .filter((r) => inMonth(r.date))
+        .map((r) => {
+          const done = r.checklist ? Object.values(r.checklist).filter(Boolean).length : 0
+          const total = r.checklist ? Object.keys(r.checklist).length : 0
+          return {
+            id: r.id,
+            'Date-time (submitted)': fmtDT(r.created_at),
+            Asset: assetsById[r.asset_id]?.asset_code || '—',
+            Device: assetsById[r.asset_id]?.device_type || '',
+            Company: customersById[r.customer_id]?.company || 'Unknown',
+            'Engineer (done by)': r.engineer,
+            Result: r.result || '',
+            Issue: r.issue_category || '',
+            'Checks done': `${done}/${total}`,
+            'Activities performed': r.checklist ? Object.entries(r.checklist).filter(([, v]) => v).map(([k]) => k).join('; ') : '',
+            Parts: r.parts_replaced || '',
+            Remarks: r.remarks || '',
+          }
+        }),
+    [reports, assetsById, customersById, month]
+  )
+
+  // ---------- Report: Full export ----------
   const exportEverything = () => {
     download(
       [
         ['Customers', customers.map((c) => ({ Company: c.company, Venture: c.venture, Segment: c.segment, Contact: c.contact, Phone: c.phone, Email: c.email, Notes: c.notes }))],
         ['Contracts', amcRows],
         ['Assets', assets.map((a) => ({ Code: a.asset_code, Company: customersById[a.customer_id]?.company || '', Type: a.device_type, Brand: a.brand, Model: a.model, Serial: a.serial_number, Location: a.location }))],
-        ['Tickets', tickets.map((t) => ({ Created: String(t.created_at || '').slice(0, 10), Company: customersById[t.customer_id]?.company || '', Asset: t.asset_id ? assetsById[t.asset_id]?.asset_code : '', Title: t.title, Priority: t.priority, Status: t.status, Assigned: t.assigned_to || '', By: t.created_by || '' }))],
-        ['Service Reports', reports.map((r) => ({ Date: r.date, Asset: assetsById[r.asset_id]?.asset_code || '', Company: customersById[r.customer_id]?.company || '', Engineer: r.engineer, Result: r.result, Issue: r.issue_category, Parts: r.parts_replaced || '', Remarks: r.remarks || '' }))],
-        ['Attendance', attendance.map((a) => ({ Engineer: a.engineer, Company: a.customer_id ? customersById[a.customer_id]?.company : '', 'Check in': a.check_in, 'Check out': a.check_out || '', 'In GPS': a.in_lat ? `${a.in_lat},${a.in_lng}` : '', 'Out GPS': a.out_lat ? `${a.out_lat},${a.out_lng}` : '' }))],
+        ['Tickets', ticketRows],
+        ['Service Reports', serviceRows.map(({ id, ...rest }) => rest)],
+        ['Attendance', attendance.map((a) => ({ Engineer: a.engineer, Company: a.customer_id ? customersById[a.customer_id]?.company : '', 'Check in (date-time)': fmtDT(a.check_in), 'Check out (date-time)': fmtDT(a.check_out), 'Minutes on site': a.check_out ? Math.round((new Date(a.check_out) - new Date(a.check_in)) / 60000) : '', 'In GPS': a.in_lat ? `${a.in_lat},${a.in_lng}` : '', 'Out GPS': a.out_lat ? `${a.out_lat},${a.out_lng}` : '' }))],
         ['Expenses', expenses.map((e) => ({ Date: e.date, Engineer: e.engineer, Amount: Number(e.amount || 0), Mode: e.travel_mode, From: e.from_location, To: e.to_location, Status: e.status, 'Approved by': e.approved_by || '' }))],
         ['Feedback', feedback.map((f) => ({ Ticket: f.ticket_id, Resolved: f.problem_resolved, 'Outstanding issues': f.outstanding_issues, Recommendations: f.recommendations, Rating: f.rating, Date: String(f.created_at || '').slice(0, 10) }))],
       ],
@@ -179,7 +231,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           <p className="text-sm font-medium">2 · Company-wise tickets</p>
           <p className="text-xs text-slate-500">Raised / resolved / pending per customer{month !== 'All' ? ` for ${month}` : ''}.</p>
         </div>
-        <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Company Tickets', companyTickets]], `company-tickets-${month}.xlsx`)}>
+        <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Company Summary', companyTickets], ['Ticket Register (detailed)', ticketRows]], `company-tickets-${month}.xlsx`)}>
           Export Excel
         </button>
       </div>
@@ -204,9 +256,33 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
         </button>
       </div>
 
+      <div className={card}>
+        <div>
+          <p className="text-sm font-medium">5 · Service reports register (QR scans)</p>
+          <p className="text-xs text-slate-500">Every checklist submitted after scanning an asset — date-time, done by whom, activities performed. {serviceRows.length} in view.</p>
+        </div>
+        <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Service Reports', serviceRows.map(({ id, ...r }) => r)]], `service-reports-${month}.xlsx`)}>
+          Export Excel
+        </button>
+      </div>
+
+      <DataTable
+        empty="No service reports yet. They appear the moment an engineer scans an asset QR and submits the checklist."
+        columns={[
+          { key: 'Date-time (submitted)', label: 'Date & Time', width: '150px' },
+          { key: 'Asset', label: 'Asset', width: '100px', render: (r) => <span className="font-mono text-xs font-semibold text-indigo-700">{r['Asset']}</span> },
+          { key: 'Company', label: 'Customer' },
+          { key: 'Engineer (done by)', label: 'Done By', width: '170px', render: (r) => <span className="text-xs">{r['Engineer (done by)']}</span> },
+          { key: 'Result', label: 'Result', width: '140px' },
+          { key: 'Checks done', label: 'Checks', width: '70px', align: 'center' },
+          { key: 'Activities performed', label: 'Activities Performed', render: (r) => <span className="text-xs text-slate-600">{r['Activities performed']}</span> },
+        ]}
+        rows={serviceRows}
+      />
+
       <div className={card + ' border-emerald-300 bg-emerald-50'}>
         <div>
-          <p className="text-sm font-medium">5 · FULL BACKUP — everything, one file</p>
+          <p className="text-sm font-medium">6 · FULL BACKUP — everything, one file</p>
           <p className="text-xs text-slate-600">All 8 tables as separate sheets: customers, contracts, assets, tickets, service reports, attendance, expenses, feedback. Run this weekly and keep it on your NAS.</p>
         </div>
         <button className={`${btn} bg-emerald-600 text-white hover:bg-emerald-700`} onClick={exportEverything}>
