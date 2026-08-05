@@ -3,8 +3,9 @@ import * as XLSX from 'xlsx'
 import { DataTable } from './ui'
 
 const btn = 'px-4 py-2 rounded-md text-sm font-medium'
-const fmtDT = (ts) => (ts ? new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+const fmtDT = (ts) => (ts ? new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
+const tat = (t) => (t.created_at && t.resolved_at ? Math.round(((new Date(t.resolved_at) - new Date(t.created_at)) / 86400000) * 10) / 10 : null)
 
 const download = (sheets, filename) => {
   const wb = XLSX.utils.book_new()
@@ -44,7 +45,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
     const map = {}
     const get = (name) => {
       if (!name) name = 'Unassigned'
-      if (!map[name]) map[name] = { Engineer: name, 'Tickets handled': 0, 'Tickets resolved': 0, 'Repeat calls (marked)': 0, 'Repeat calls (auto)': 0, 'Service reports': 0, 'Site visits': 0, 'Minutes on site': 0 }
+      if (!map[name]) map[name] = { Engineer: name, 'Tickets handled': 0, 'Tickets resolved': 0, 'Avg TAT (days)': 0, 'Repeat calls (marked)': 0, 'Repeat calls (auto)': 0, 'Service reports': 0, 'Site visits': 0, 'Minutes on site': 0, _tats: [] }
       return map[name]
     }
     const filteredTickets = tickets.filter((t) => inMonth(t.created_at))
@@ -53,8 +54,9 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
       row['Tickets handled']++
       if (t.status === 'Resolved' || t.status === 'Closed') row['Tickets resolved']++
       if (t.repeat_call) row['Repeat calls (marked)']++
+      const d = tat(t)
+      if (d !== null) row._tats.push(d)
     })
-    // repeat call: another ticket on the same asset within 30 days before this one
     filteredTickets.forEach((t) => {
       if (!t.asset_id) return
       const earlier = tickets.find(
@@ -68,7 +70,10 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
       row['Site visits']++
       if (a.check_out) row['Minutes on site'] += Math.round((new Date(a.check_out) - new Date(a.check_in)) / 60000)
     })
-    return Object.values(map)
+    return Object.values(map).map(({ _tats, ...row }) => ({
+      ...row,
+      'Avg TAT (days)': _tats.length ? Math.round((_tats.reduce((s, x) => s + x, 0) / _tats.length) * 10) / 10 : '',
+    }))
   }, [tickets, reports, attendance, month])
 
   // Detailed ticket register with full date-time audit trail
@@ -82,12 +87,14 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           Asset: t.asset_id ? assetsById[t.asset_id]?.asset_code || '' : '',
           Issue: t.title,
           Details: t.description || '',
+          'Raised for (user)': t.affected_user || '',
           Priority: t.priority,
           Status: t.status,
           'Raised by': t.created_by || '',
           'Assigned engineer': t.assigned_to || '',
           'Resolved by': t.resolved_by || '',
           'Resolved (date-time)': fmtDT(t.resolved_at),
+          'TAT (days)': tat(t) ?? '',
           'Repeat call': t.repeat_call ? 'YES' : '',
           'Repeat marked by': t.repeat_marked_by || '',
         })),
@@ -99,12 +106,17 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
     const map = {}
     tickets.filter((t) => inMonth(t.created_at)).forEach((t) => {
       const name = customersById[t.customer_id]?.company || 'Unknown'
-      if (!map[name]) map[name] = { Company: name, Raised: 0, Resolved: 0, Pending: 0 }
+      if (!map[name]) map[name] = { Company: name, Raised: 0, Resolved: 0, Pending: 0, _tats: [] }
       map[name].Raised++
       if (t.status === 'Resolved' || t.status === 'Closed') map[name].Resolved++
       else map[name].Pending++
+      const d = tat(t)
+      if (d !== null) map[name]._tats.push(d)
     })
-    return Object.values(map)
+    return Object.values(map).map(({ _tats, ...row }) => ({
+      ...row,
+      'Avg TAT (days)': _tats.length ? Math.round((_tats.reduce((s, x) => s + x, 0) / _tats.length) * 10) / 10 : '',
+    }))
   }, [tickets, customersById, month])
 
   // ---------- Report 3: Expenses ----------
@@ -122,6 +134,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           Amount: Number(e.amount || 0),
           Status: e.status,
           'Approved by': e.approved_by || '',
+          'Approved (date-time)': fmtDT(e.approved_at),
           Notes: e.notes || '',
         })),
     [expenses, customersById, month]
@@ -152,13 +165,14 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           Start: c.start_date || '',
           End: c.end_date || '',
           'Days left': d,
-          Status: d === null ? '-' : d < 0 ? 'EXPIRED' : d <= 30 ? 'RENEW NOW' : d <= 60 ? 'Start renewal' : 'Active',
+          Scope: c.scope || '',
+          Status: c.closed ? 'CLOSED' : d === null ? '-' : d < 0 ? 'EXPIRED' : d <= 30 ? 'RENEW NOW' : d <= 60 ? 'Start renewal' : 'Active',
         }
       }),
     [contracts, customersById]
   )
 
-  // ---------- Service reports register (who scanned & serviced what, when) ----------
+  // ---------- Service reports register ----------
   const serviceRows = useMemo(
     () =>
       reports
@@ -184,18 +198,18 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
     [reports, assetsById, customersById, month]
   )
 
-  // ---------- Report: Full export ----------
+  // ---------- Full export ----------
   const exportEverything = () => {
     download(
       [
         ['Customers', customers.map((c) => ({ Company: c.company, Venture: c.venture, Segment: c.segment, Contact: c.contact, Phone: c.phone, Email: c.email, Notes: c.notes }))],
         ['Contracts', amcRows],
-        ['Assets', assets.map((a) => ({ Code: a.asset_code, Company: customersById[a.customer_id]?.company || '', Type: a.device_type, Brand: a.brand, Model: a.model, Serial: a.serial_number, Location: a.location }))],
+        ['Assets', assets.map((a) => ({ Code: a.asset_code, Company: customersById[a.customer_id]?.company || '', Type: a.device_type, Brand: a.brand, Model: a.model, Serial: a.serial_number, 'Assigned to': a.assigned_to || '', Department: a.department || '', Status: a.status || '', Location: a.location }))],
         ['Tickets', ticketRows],
         ['Service Reports', serviceRows.map(({ id, ...rest }) => rest)],
         ['Attendance', attendance.map((a) => ({ Engineer: a.engineer, Company: a.customer_id ? customersById[a.customer_id]?.company : '', 'Check in (date-time)': fmtDT(a.check_in), 'Check out (date-time)': fmtDT(a.check_out), 'Minutes on site': a.check_out ? Math.round((new Date(a.check_out) - new Date(a.check_in)) / 60000) : '', 'In GPS': a.in_lat ? `${a.in_lat},${a.in_lng}` : '', 'Out GPS': a.out_lat ? `${a.out_lat},${a.out_lng}` : '' }))],
-        ['Expenses', expenses.map((e) => ({ Date: e.date, Engineer: e.engineer, Amount: Number(e.amount || 0), Mode: e.travel_mode, From: e.from_location, To: e.to_location, Status: e.status, 'Approved by': e.approved_by || '' }))],
-        ['Feedback', feedback.map((f) => ({ Ticket: f.ticket_id, Resolved: f.problem_resolved, 'Outstanding issues': f.outstanding_issues, Recommendations: f.recommendations, Rating: f.rating, Date: String(f.created_at || '').slice(0, 10) }))],
+        ['Expenses', expenseRows],
+        ['Feedback', feedback.map((f) => ({ Ticket: f.ticket_id, Resolved: f.problem_resolved, 'Outstanding issues': f.outstanding_issues, Recommendations: f.recommendations, Rating: f.rating, 'Submitted (date-time)': fmtDT(f.created_at), By: f.submitted_by || '' }))],
       ],
       `full-backup-${new Date().toISOString().slice(0, 10)}.xlsx`
     )
@@ -210,16 +224,14 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
         <h2 className="font-medium">Reports & Excel exports</h2>
         <select className="border border-slate-300 rounded-md px-3 py-2 text-sm" value={month} onChange={(e) => setMonth(e.target.value)}>
           <option value="All">All time</option>
-          {months.map((m) => (
-            <option key={m}>{m}</option>
-          ))}
+          {months.map((m) => <option key={m}>{m}</option>)}
         </select>
       </div>
 
       <div className={card}>
         <div>
           <p className="text-sm font-medium">1 · Engineer performance</p>
-          <p className="text-xs text-slate-500">Tickets handled/resolved, repeat calls (same asset within 30 days), service reports, site visits, minutes on site.</p>
+          <p className="text-xs text-slate-500">Tickets handled/resolved, average TAT, repeat calls (marked by team + auto-detected), service reports, site visits, minutes on site.</p>
         </div>
         <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Engineer Performance', engineerPerf]], `engineer-performance-${month}.xlsx`)}>
           Export Excel
@@ -229,7 +241,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
       <div className={card}>
         <div>
           <p className="text-sm font-medium">2 · Company-wise tickets</p>
-          <p className="text-xs text-slate-500">Raised / resolved / pending per customer{month !== 'All' ? ` for ${month}` : ''}.</p>
+          <p className="text-xs text-slate-500">Raised / resolved / pending / average TAT per customer, plus the full detailed ticket register with date-time stamps.</p>
         </div>
         <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Company Summary', companyTickets], ['Ticket Register (detailed)', ticketRows]], `company-tickets-${month}.xlsx`)}>
           Export Excel
@@ -249,7 +261,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
       <div className={card}>
         <div>
           <p className="text-sm font-medium">4 · AMC contracts & renewals</p>
-          <p className="text-xs text-slate-500">Every contract with days-left and renewal status — your renewal working file.</p>
+          <p className="text-xs text-slate-500">Every contract with days-left, scope, and renewal status — your renewal working file.</p>
         </div>
         <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['AMC Renewals', amcRows]], `amc-renewals.xlsx`)}>
           Export Excel
@@ -283,14 +295,13 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
       <div className={card + ' border-emerald-300 bg-emerald-50'}>
         <div>
           <p className="text-sm font-medium">6 · FULL BACKUP — everything, one file</p>
-          <p className="text-xs text-slate-600">All 8 tables as separate sheets: customers, contracts, assets, tickets, service reports, attendance, expenses, feedback. Run this weekly and keep it on your NAS.</p>
+          <p className="text-xs text-slate-600">All tables as separate sheets with full date-time stamps: customers, contracts, assets (with allotment), tickets, service reports, attendance, expenses, feedback. Run this weekly and keep it on your NAS.</p>
         </div>
         <button className={`${btn} bg-emerald-600 text-white hover:bg-emerald-700`} onClick={exportEverything}>
           Export ALL data
         </button>
       </div>
 
-      {/* Customer feedback list */}
       <div className="bg-white rounded-lg border border-slate-200">
         <p className="px-4 py-3 border-b border-slate-200 font-medium text-sm">Customer feedback received ({feedback.length})</p>
         {feedback.length === 0 ? (
@@ -303,7 +314,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
                   {'★'.repeat(f.rating || 0)}{'☆'.repeat(5 - (f.rating || 0))} — Problem resolved: {f.problem_resolved || '—'} · Outstanding issues: {f.outstanding_issues || 'None'}
                 </p>
                 {f.recommendations && <p className="text-xs text-slate-500 mt-1">Recommendation: {f.recommendations}</p>}
-                <p className="text-xs text-slate-400 mt-0.5">{String(f.created_at || '').slice(0, 10)}{f.submitted_by ? ` · ${f.submitted_by}` : ''}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{fmtDT(f.created_at)}{f.submitted_by ? ` · ${f.submitted_by}` : ''}</p>
               </li>
             ))}
           </ul>

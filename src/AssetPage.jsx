@@ -59,7 +59,7 @@ export default function AssetPage({ code, session }) {
 
   const amc = useMemo(() => {
     const active = contracts
-      .filter((c) => (daysLeft(c.end_date) ?? -1) >= 0)
+      .filter((c) => !c.closed && (daysLeft(c.end_date) ?? -1) >= 0)
       .sort((a, b) => (daysLeft(b.end_date) ?? 0) - (daysLeft(a.end_date) ?? 0))[0]
     return active || null
   }, [contracts])
@@ -109,9 +109,7 @@ export default function AssetPage({ code, session }) {
           <p className="text-sm text-slate-500 mt-2">
             This QR is not registered in the system. Do not service under AMC — contact the office before proceeding.
           </p>
-          <a href="#/" className="inline-block mt-4 text-sm text-indigo-600 hover:underline">
-            ← Back to dashboard
-          </a>
+          <a href="#/" className="inline-block mt-4 text-sm text-indigo-600 hover:underline">← Back to dashboard</a>
         </div>
       </div>
     )
@@ -127,21 +125,14 @@ export default function AssetPage({ code, session }) {
             <p className="font-mono text-lg font-semibold">{asset.asset_code}</p>
             <p className="text-slate-400 text-xs">{customer ? customer.company : ''}</p>
           </div>
-          <a href="#/" className="text-xs text-indigo-300 hover:text-white">
-            Dashboard
-          </a>
+          <a href="#/" className="text-xs text-indigo-300 hover:text-white">Dashboard</a>
         </div>
       </header>
 
       <main className="max-w-xl mx-auto px-4 py-4 space-y-4">
         {notice && <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">{notice}</p>}
 
-        {/* AMC STATUS — the big verdict */}
-        <div
-          className={`rounded-lg p-4 text-center border-2 ${
-            underAmc ? 'bg-emerald-50 border-emerald-400' : 'bg-red-50 border-red-400'
-          }`}
-        >
+        <div className={`rounded-lg p-4 text-center border-2 ${underAmc ? 'bg-emerald-50 border-emerald-400' : 'bg-red-50 border-red-400'}`}>
           <p className={`text-xl font-bold ${underAmc ? 'text-emerald-700' : 'text-red-700'}`}>
             {underAmc ? '✔ UNDER AMC' : '✖ NOT UNDER AMC'}
           </p>
@@ -152,24 +143,21 @@ export default function AssetPage({ code, session }) {
           </p>
         </div>
 
-        {/* Device details */}
         <div className="bg-white rounded-lg border border-slate-200 p-4 text-sm">
           <p className="font-medium">{asset.device_type} — {asset.brand} {asset.model}</p>
           <p className="text-slate-500 text-xs mt-1">S/N: {asset.serial_number}</p>
           {asset.location && <p className="text-slate-500 text-xs">Location: {asset.location}</p>}
+          {asset.assigned_to && <p className="text-slate-500 text-xs">Assigned to: {asset.assigned_to}{asset.department ? ` (${asset.department})` : ''}</p>}
           <p className="text-xs mt-2">
             Last service:{' '}
             {lastReport ? (
-              <span className="font-medium text-slate-800">
-                {lastReport.date} by {lastReport.engineer} — {lastReport.result}
-              </span>
+              <span className="font-medium text-slate-800">{lastReport.date} by {lastReport.engineer} — {lastReport.result}</span>
             ) : (
               <span className="text-amber-600 font-medium">Never serviced (first visit)</span>
             )}
           </p>
         </div>
 
-        {/* Service form */}
         {!showForm ? (
           <button onClick={startService} className={`${btn} w-full bg-indigo-600 text-white hover:bg-indigo-700 py-3 text-base`}>
             Start service report
@@ -180,31 +168,22 @@ export default function AssetPage({ code, session }) {
             <div className="space-y-2">
               {checklist.map((item) => (
                 <label key={item} className="flex items-start gap-3 text-sm bg-slate-50 rounded-md px-3 py-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-5 w-5 accent-indigo-600"
-                    checked={!!checks[item]}
-                    onChange={(e) => setChecks({ ...checks, [item]: e.target.checked })}
-                  />
+                  <input type="checkbox" className="mt-0.5 h-5 w-5 accent-indigo-600" checked={!!checks[item]}
+                    onChange={(e) => setChecks({ ...checks, [item]: e.target.checked })} />
                   <span>{item}</span>
                 </label>
               ))}
             </div>
-
             <div>
               <span className={label}>Device condition after service</span>
               <select className={input} value={result} onChange={(e) => setResult(e.target.value)}>
-                {RESULT_OPTIONS.map((o) => (
-                  <option key={o}>{o}</option>
-                ))}
+                {RESULT_OPTIONS.map((o) => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <span className={label}>Issue category</span>
               <select className={input} value={issue} onChange={(e) => setIssue(e.target.value)}>
-                {ISSUE_OPTIONS.map((o) => (
-                  <option key={o}>{o}</option>
-                ))}
+                {ISSUE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
@@ -219,14 +198,11 @@ export default function AssetPage({ code, session }) {
               <button onClick={submit} disabled={saving} className={`${btn} flex-1 bg-emerald-600 text-white hover:bg-emerald-700 py-3 disabled:opacity-60`}>
                 {saving ? 'Submitting…' : 'Submit report'}
               </button>
-              <button onClick={() => setShowForm(false)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>
-                Cancel
-              </button>
+              <button onClick={() => setShowForm(false)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
             </div>
           </div>
         )}
 
-        {/* History */}
         <div className="bg-white rounded-lg border border-slate-200">
           <p className="px-4 py-3 border-b border-slate-200 font-medium text-sm">Service history ({reports.length})</p>
           {reports.length === 0 ? (
@@ -238,9 +214,7 @@ export default function AssetPage({ code, session }) {
                 const total = r.checklist ? Object.keys(r.checklist).length : 0
                 return (
                   <li key={r.id} className="px-4 py-3 text-sm">
-                    <p className="font-medium">
-                      {r.date} — {r.result}
-                    </p>
+                    <p className="font-medium">{r.date} — {r.result}</p>
                     <p className="text-xs text-slate-500">
                       {r.engineer} · {done}/{total} checks done · {r.issue_category}
                       {r.parts_replaced ? ` · Parts: ${r.parts_replaced}` : ''}

@@ -21,7 +21,15 @@ const statusTone = {
   Closed: 'bg-slate-200 text-slate-500',
 }
 
-const emptyTicket = { customer_id: '', asset_id: '', title: '', description: '', priority: 'Medium', status: 'Open', assigned_to: '' }
+const emptyTicket = { customer_id: '', asset_id: '', title: '', description: '', affected_user: '', priority: 'Medium', status: 'Open', assigned_to: '' }
+
+// TAT: days from raised to resolved (or running days if still open)
+export const tatDays = (t) => {
+  if (!t.created_at) return null
+  const end = t.resolved_at ? new Date(t.resolved_at) : new Date()
+  const days = (end - new Date(t.created_at)) / 86400000
+  return Math.round(days * 10) / 10
+}
 
 export default function TicketsTab({ customers, assets, tickets, reload, flash, session, role }) {
   const isMgmt = role === 'admin' || role === 'accounts'
@@ -119,30 +127,20 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
             <span className={label}>Customer *</span>
             <select className={input} value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value, asset_id: '' })}>
               <option value="">Select…</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.company}
-                </option>
-              ))}
+              {customers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
             </select>
           </div>
           <div>
             <span className={label}>Related asset (optional)</span>
             <select className={input} value={form.asset_id || ''} onChange={(e) => setForm({ ...form, asset_id: e.target.value })}>
               <option value="">None</option>
-              {customerAssets.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.asset_code} — {a.device_type}
-                </option>
-              ))}
+              {customerAssets.map((a) => <option key={a.id} value={a.id}>{a.asset_code} — {a.device_type}</option>)}
             </select>
           </div>
           <div>
             <span className={label}>Priority</span>
             <select className={input} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
-              {TICKET_PRIORITIES.map((p) => (
-                <option key={p}>{p}</option>
-              ))}
+              {TICKET_PRIORITIES.map((p) => <option key={p}>{p}</option>)}
             </select>
           </div>
           <div className="md:col-span-2">
@@ -150,10 +148,14 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
             <input className={input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Printer not printing — Accounts dept" />
           </div>
           <div>
+            <span className={label}>Raised for (end user name)</span>
+            <input className={input} value={form.affected_user || ''} onChange={(e) => setForm({ ...form, affected_user: e.target.value })} placeholder="e.g. Ramesh — Accounts" />
+          </div>
+          <div>
             <span className={label}>Assigned engineer</span>
             <input className={input} value={form.assigned_to || ''} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} placeholder="Name / email" />
           </div>
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <span className={label}>Description</span>
             <textarea className={input} rows={2} value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
@@ -161,19 +163,13 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
             <div>
               <span className={label}>Status</span>
               <select className={input} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                {TICKET_STATUSES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
+                {TICKET_STATUSES.map((s) => <option key={s}>{s}</option>)}
               </select>
             </div>
           )}
           <div className="md:col-span-3 flex gap-2">
-            <button onClick={save} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>
-              Save ticket
-            </button>
-            <button onClick={() => setForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>
-              Cancel
-            </button>
+            <button onClick={save} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save ticket</button>
+            <button onClick={() => setForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
           </div>
         </div>
       )}
@@ -184,8 +180,14 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
           { key: 'created_at', label: 'Raised', width: '130px', render: (t) => <span className="text-xs">{fmtDT(t.created_at)}</span> },
           { key: 'company', label: 'Customer', render: (t) => <span className="font-medium">{customersById[t.customer_id]?.company || 'Unknown'}</span> },
           { key: 'asset', label: 'Asset', width: '100px', render: (t) => t.asset_id ? <span className="font-mono text-xs">{assetsById[t.asset_id]?.asset_code}</span> : '' },
-          { key: 'title', label: 'Issue', render: (t) => (<span>{t.title}{t.description && <span className="block text-xs text-slate-500 mt-0.5">{t.description}</span>}</span>) },
-          { key: 'assigned_to', label: 'Assigned To', width: '150px', render: (t) => t.assigned_to || <span className="text-slate-400">Unassigned</span> },
+          { key: 'title', label: 'Issue', render: (t) => (
+            <span>
+              {t.title}
+              {t.affected_user && <span className="block text-xs text-indigo-700 mt-0.5">For: {t.affected_user}</span>}
+              {t.description && <span className="block text-xs text-slate-500 mt-0.5">{t.description}</span>}
+            </span>
+          ) },
+          { key: 'assigned_to', label: 'Assigned To', width: '140px', render: (t) => t.assigned_to || <span className="text-slate-400">Unassigned</span> },
           { key: 'priority', label: 'Priority', width: '90px', render: (t) => <span className={chip(prioTone[t.priority] || '')}>{t.priority}</span> },
           { key: 'status', label: 'Status', width: '110px', render: (t) => (
             <span>
@@ -193,8 +195,14 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
               {t.repeat_call && <span className="block mt-1"><span className={chip('bg-purple-100 text-purple-700')}>REPEAT</span></span>}
             </span>
           ) },
+          { key: 'tat', label: 'TAT', width: '90px', align: 'right', render: (t) => {
+            const d = tatDays(t)
+            if (d === null) return ''
+            const closed = t.status === 'Resolved' || t.status === 'Closed'
+            return <span className={`text-xs tabular-nums ${closed ? 'text-emerald-700' : d > 2 ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>{d}d{closed ? '' : ' open'}</span>
+          } },
           { key: 'resolved', label: 'Resolved By', width: '150px', render: (t) => t.resolved_by ? (<span className="text-xs">{t.resolved_by}<span className="block text-slate-400">{fmtDT(t.resolved_at)}</span></span>) : '' },
-          { key: 'act', label: 'Actions', width: '190px', render: (t) => (
+          { key: 'act', label: 'Actions', width: '200px', render: (t) => (
             <span className="text-xs font-medium">
               {t.status === 'Open' && <button onClick={() => quickStatus(t, 'In Progress')} className="text-indigo-700 hover:underline mr-2">Start</button>}
               {(t.status === 'Open' || t.status === 'In Progress') && <button onClick={() => quickStatus(t, 'Resolved')} className="text-emerald-700 hover:underline mr-2">Resolve</button>}

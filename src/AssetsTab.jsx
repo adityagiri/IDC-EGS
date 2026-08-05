@@ -1,12 +1,19 @@
 import React, { useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { supabase } from './supabase'
-import { DEVICE_TYPE_LIST } from './checklists'
-import { DataTable, SectionBar } from './ui'
+import { DEVICE_TYPE_LIST, ASSET_STATUSES } from './checklists'
+import { DataTable, chip } from './ui'
 
 const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const label = 'block text-xs font-medium text-slate-500 mb-1'
 const btn = 'px-4 py-2 rounded-md text-sm font-medium'
+
+const assetStatusTone = {
+  'In Use': 'bg-emerald-100 text-emerald-700',
+  'In Store': 'bg-blue-100 text-blue-700',
+  'Under Repair': 'bg-amber-100 text-amber-800',
+  Scrapped: 'bg-red-100 text-red-700',
+}
 
 const emptyAsset = {
   customer_id: '',
@@ -15,6 +22,9 @@ const emptyAsset = {
   model: '',
   serial_number: '',
   location: '',
+  assigned_to: '',
+  department: '',
+  status: 'In Use',
   notes: '',
 }
 
@@ -93,7 +103,7 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
         <div class="sn">S/N: ${asset.serial_number || '-'}</div>
         <div class="warn">Scan before every service. Do not remove this label.</div>
       </div>
-      <script>window.onload = () => setTimeout(() => window.print(), 300)<\/script>
+      <script>window.onload = () => setTimeout(() => window.print(), 300)<\\/script>
       </body></html>`)
     w.document.close()
   }
@@ -105,11 +115,7 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
         <div className="flex gap-2">
           <select className={input + ' w-auto'} value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}>
             <option value="All">All customers</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.company}
-              </option>
-            ))}
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
           </select>
           <button
             onClick={() => setForm({ ...emptyAsset })}
@@ -127,19 +133,13 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
             <span className={label}>Customer *</span>
             <select className={input} value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })}>
               <option value="">Select…</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.company} ({c.venture})
-                </option>
-              ))}
+              {customers.map((c) => <option key={c.id} value={c.id}>{c.company} ({c.venture})</option>)}
             </select>
           </div>
           <div>
             <span className={label}>Device type</span>
             <select className={input} value={form.device_type} onChange={(e) => setForm({ ...form, device_type: e.target.value })}>
-              {DEVICE_TYPE_LIST.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
+              {DEVICE_TYPE_LIST.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div>
@@ -158,17 +158,27 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
             <span className={label}>Location at site</span>
             <input className={input} value={form.location || ''} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Accounts dept, 2nd floor" />
           </div>
+          <div>
+            <span className={label}>Assigned to (user)</span>
+            <input className={input} value={form.assigned_to || ''} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} placeholder="Employee using this device" />
+          </div>
+          <div>
+            <span className={label}>Department</span>
+            <input className={input} value={form.department || ''} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="Accounts / Sales / Admin" />
+          </div>
+          <div>
+            <span className={label}>Status</span>
+            <select className={input} value={form.status || 'In Use'} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              {ASSET_STATUSES.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
           <div className="md:col-span-3">
             <span className={label}>Notes</span>
             <textarea className={input} rows={2} value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
           <div className="md:col-span-3 flex gap-2">
-            <button onClick={save} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>
-              Save asset
-            </button>
-            <button onClick={() => setForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>
-              Cancel
-            </button>
+            <button onClick={save} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save asset</button>
+            <button onClick={() => setForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
           </div>
         </div>
       )}
@@ -178,9 +188,11 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
         columns={[
           { key: 'asset_code', label: 'Asset Code', width: '110px', render: (a) => <span className="font-mono font-semibold text-indigo-700">{a.asset_code}</span> },
           { key: 'company', label: 'Customer', render: (a) => customersById[a.customer_id]?.company || 'Unknown' },
-          { key: 'device_type', label: 'Device Type', width: '170px' },
+          { key: 'device_type', label: 'Device Type', width: '160px' },
           { key: 'brand', label: 'Brand / Model', render: (a) => `${a.brand || ''} ${a.model || ''}`.trim() },
-          { key: 'serial_number', label: 'Serial No.', width: '150px', render: (a) => <span className="font-mono text-xs">{a.serial_number}</span> },
+          { key: 'serial_number', label: 'Serial No.', width: '140px', render: (a) => <span className="font-mono text-xs">{a.serial_number}</span> },
+          { key: 'assigned', label: 'Assigned To', width: '150px', render: (a) => a.assigned_to ? (<span>{a.assigned_to}{a.department && <span className="block text-xs text-slate-500">{a.department}</span>}</span>) : '' },
+          { key: 'status', label: 'Status', width: '110px', render: (a) => <span className={chip(assetStatusTone[a.status] || 'bg-slate-100 text-slate-600')}>{a.status || 'In Use'}</span> },
           { key: 'location', label: 'Location', render: (a) => <span className="text-slate-600">{a.location}</span> },
           { key: 'act', label: 'Actions', width: '220px', render: (a) => (
             <span className="text-xs font-medium">
