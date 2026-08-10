@@ -44,7 +44,7 @@ export default function AssetPage({ code, session }) {
     setAsset(a)
     const [c, k, r] = await Promise.all([
       supabase.from('customers').select('*').eq('id', a.customer_id).maybeSingle(),
-      supabase.from('contracts').select('*').eq('customer_id', a.customer_id),
+      supabase.rpc('asset_amc_status', { cust: a.customer_id }),
       supabase.from('service_reports').select('*').eq('asset_id', a.id).order('date', { ascending: false }),
     ])
     setCustomer(c.data)
@@ -59,7 +59,7 @@ export default function AssetPage({ code, session }) {
 
   const amc = useMemo(() => {
     const active = contracts
-      .filter((c) => !c.closed && (daysLeft(c.end_date) ?? -1) >= 0)
+      .filter((c) => (daysLeft(c.end_date) ?? -1) >= 0)
       .sort((a, b) => (daysLeft(b.end_date) ?? 0) - (daysLeft(a.end_date) ?? 0))[0]
     return active || null
   }, [contracts])

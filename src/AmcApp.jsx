@@ -93,6 +93,7 @@ export default function AmcApp({ session, onSignOut }) {
         admin: ['dashboard', 'customers', 'contracts', 'assets', 'tickets', 'attendance', 'expenses', 'reports', 'team'],
         accounts: ['dashboard', 'tickets', 'expenses', 'reports'],
         engineer: ['assets', 'tickets', 'attendance', 'expenses'],
+        operations: ['customers', 'assets', 'tickets', 'attendance', 'expenses'],
       }[role] || ['tickets']
       if (!allowed.includes(tab)) setTab(allowed[0])
     }
@@ -199,7 +200,6 @@ export default function AmcApp({ session, onSignOut }) {
   const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
   const label = 'block text-xs font-medium text-slate-500 mb-1'
   const btn = 'px-4 py-2 rounded-md text-sm font-medium'
-  const link = 'text-xs text-indigo-700 hover:underline font-medium'
 
   const act = (fn, text, tone) => (
     <button onClick={fn} className={`text-xs ${tone || 'text-indigo-700'} hover:underline font-medium mr-2`}>
@@ -219,9 +219,7 @@ export default function AmcApp({ session, onSignOut }) {
             <span className="text-xs text-emerald-400 h-4">{notice}</span>
             <select value={filterVenture} onChange={(e) => setFilterVenture(e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm">
               <option>All</option>
-              {VENTURES.map((v) => (
-                <option key={v}>{v}</option>
-              ))}
+              {VENTURES.map((v) => <option key={v}>{v}</option>)}
             </select>
             <div className="text-right border-l border-slate-700 pl-3">
               <p className="text-xs text-slate-300">{session.user.email}</p>
@@ -232,12 +230,12 @@ export default function AmcApp({ session, onSignOut }) {
         <nav className="max-w-7xl mx-auto px-4 flex gap-0.5 overflow-x-auto">
           {[
             ['dashboard', 'Dashboard', ['admin', 'accounts']],
-            ['customers', 'Customers', ['admin']],
+            ['customers', 'Customers', ['admin', 'operations']],
             ['contracts', 'Contracts', ['admin']],
-            ['assets', 'Assets', ['admin', 'engineer']],
-            ['tickets', 'Tickets', ['admin', 'accounts', 'engineer']],
-            ['attendance', 'Attendance', ['admin', 'engineer']],
-            ['expenses', 'Expenses', ['admin', 'accounts', 'engineer']],
+            ['assets', 'Assets', ['admin', 'engineer', 'operations']],
+            ['tickets', 'Tickets', ['admin', 'accounts', 'engineer', 'operations']],
+            ['attendance', 'Attendance', ['admin', 'engineer', 'operations']],
+            ['expenses', 'Expenses', ['admin', 'accounts', 'engineer', 'operations']],
             ['reports', 'Reports', ['admin', 'accounts']],
             ['team', 'Team', ['admin']],
           ]
@@ -317,7 +315,7 @@ export default function AmcApp({ session, onSignOut }) {
                       <input className={input} value={custForm.contact || ''} onChange={(e) => setCustForm({ ...custForm, contact: e.target.value })} /></div>
                     <div><span className={label}>Phone</span>
                       <input className={input} value={custForm.phone || ''} onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })} /></div>
-                    <div><span className={label}>Email</span>
+                    <div><span className={label}>Email (used for customer portal login)</span>
                       <input className={input} value={custForm.email || ''} onChange={(e) => setCustForm({ ...custForm, email: e.target.value })} /></div>
                     <div className="md:col-span-3"><span className={label}>Notes</span>
                       <textarea className={input} rows={2} value={custForm.notes || ''} onChange={(e) => setCustForm({ ...custForm, notes: e.target.value })} /></div>

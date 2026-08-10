@@ -3,8 +3,8 @@ import { supabase } from './supabase'
 
 const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const btn = 'px-4 py-2 rounded-md text-sm font-medium'
-const ROLES = ['admin', 'accounts', 'engineer']
-const roleTone = { admin: 'bg-indigo-100 text-indigo-800', accounts: 'bg-teal-100 text-teal-800', engineer: 'bg-slate-100 text-slate-600' }
+const ROLES = ['admin', 'accounts', 'engineer', 'operations']
+const roleTone = { admin: 'bg-indigo-100 text-indigo-800', accounts: 'bg-teal-100 text-teal-800', engineer: 'bg-slate-100 text-slate-600', operations: 'bg-amber-100 text-amber-800' }
 
 export default function TeamTab({ staff, reload, flash, session }) {
   const [email, setEmail] = useState('')
@@ -47,8 +47,7 @@ export default function TeamTab({ staff, reload, flash, session }) {
           <button onClick={add} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save</button>
         </div>
         <p className="text-xs text-slate-400 mt-2">
-          Roles: <b>admin</b> = everything · <b>accounts</b> = expenses, tickets, reports · <b>engineer</b> = assets scan, tickets, attendance, own expenses.
-          The login itself is created separately in Supabase → Authentication → Users (same email).
+          Roles: <b>admin</b> = everything · <b>accounts</b> = expenses, tickets, reports · <b>engineer</b> = assets scan, tickets, attendance, own expenses · <b>operations</b> = customers, assets + QR labels, tickets, attendance, expenses — but NO dashboard, contracts, values or reports. The login itself is created separately in Supabase → Authentication → Users (same email). Customer logins are NOT added here — set the email on the customer record instead.
         </p>
       </div>
 
