@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { supabase } from './supabase'
-import { TICKET_PRIORITIES, TICKET_STATUSES } from './checklists'
+import { TICKET_PRIORITIES, TICKET_STATUSES, TICKET_CATEGORIES, slaDue } from './checklists'
 import { DataTable, chip } from './ui'
 
 const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
@@ -21,7 +21,7 @@ const statusTone = {
   Closed: 'bg-slate-200 text-slate-500',
 }
 
-const emptyTicket = { customer_id: '', asset_id: '', title: '', description: '', affected_user: '', priority: 'Medium', status: 'Open', assigned_to: '' }
+const emptyTicket = { customer_id: '', asset_id: '', title: '', description: '', affected_user: '', category: 'Hardware', priority: 'Medium', status: 'Open', assigned_to: '' }
 
 // TAT: days from raised to resolved (or running days if still open)
 export const tatDays = (t) => {
@@ -62,6 +62,8 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
     } else {
       delete row.id
       row.created_by = session.user.email
+      row.channel = 'Office'
+      row.due_at = slaDue(row.priority)
       ;({ error } = await supabase.from('tickets').insert(row))
     }
     if (error) return flash('Save failed: ' + error.message)
@@ -143,6 +145,12 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
               {TICKET_PRIORITIES.map((p) => <option key={p}>{p}</option>)}
             </select>
           </div>
+          <div>
+            <span className={label}>Category</span>
+            <select className={input} value={form.category || 'Hardware'} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              {TICKET_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </div>
           <div className="md:col-span-2">
             <span className={label}>Title *</span>
             <input className={input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Printer not printing — Accounts dept" />
@@ -183,6 +191,7 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
           { key: 'title', label: 'Issue', render: (t) => (
             <span>
               {t.title}
+              <span className="block text-xs text-slate-400 mt-0.5">{t.category || ''}{t.channel ? (t.category ? ' · ' : '') + t.channel : ''}</span>
               {t.affected_user && <span className="block text-xs text-indigo-700 mt-0.5">For: {t.affected_user}</span>}
               {t.description && <span className="block text-xs text-slate-500 mt-0.5">{t.description}</span>}
             </span>
@@ -195,6 +204,12 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
               {t.repeat_call && <span className="block mt-1"><span className={chip('bg-purple-100 text-purple-700')}>REPEAT</span></span>}
             </span>
           ) },
+          { key: 'due', label: 'SLA Due', width: '120px', render: (t) => {
+            if (!t.due_at) return ''
+            const open = !(t.status === 'Resolved' || t.status === 'Closed')
+            const overdue = open && new Date(t.due_at) < new Date()
+            return <span className={`text-xs ${overdue ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>{fmtDT(t.due_at)}{overdue ? ' ⚠' : ''}</span>
+          } },
           { key: 'tat', label: 'TAT', width: '90px', align: 'right', render: (t) => {
             const d = tatDays(t)
             if (d === null) return ''

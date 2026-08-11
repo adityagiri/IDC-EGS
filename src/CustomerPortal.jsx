@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { DataTable, chip } from './ui'
-import { DEVICE_TYPE_LIST, ASSET_STATUSES } from './checklists'
+import { DEVICE_TYPE_LIST, ASSET_STATUSES, TICKET_CATEGORIES, slaDue } from './checklists'
 
 const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const label = 'block text-xs font-medium text-slate-500 mb-1'
@@ -73,6 +73,9 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
       affected_user: form.affected_user || null,
       asset_id: form.asset_id || null,
       priority: form.priority,
+      category: form.category || null,
+      channel: 'Portal',
+      due_at: slaDue(form.priority),
       status: 'Open',
       created_by: session.user.email,
     })
@@ -157,7 +160,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
         ) : tab === 'tickets' ? (
           <>
             {!form ? (
-              <button onClick={() => setForm({ title: '', description: '', affected_user: '', asset_id: '', priority: 'Medium' })}
+              <button onClick={() => setForm({ title: '', description: '', affected_user: '', asset_id: '', priority: 'Medium', category: 'Hardware' })}
                 className={`${btn} w-full md:w-auto bg-indigo-600 text-white hover:bg-indigo-700 py-3`}>
                 + Raise a new complaint / ticket
               </button>
@@ -171,6 +174,12 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
                   <span className={label}>Urgency</span>
                   <select className={input} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
                     {['Low', 'Medium', 'High', 'Critical'].map((p) => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <span className={label}>Issue type</span>
+                  <select className={input} value={form.category || 'Hardware'} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                    {TICKET_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
@@ -277,6 +286,46 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
               </div>
             )}
 
+            {assets.length > 0 && (() => {
+              const types = {}
+              assets.forEach((a) => {
+                const t = a.device_type || 'Other'
+                if (!types[t]) types[t] = { type: t, 'In Use': 0, 'In Store': 0, 'Under Repair': 0, Scrapped: 0, total: 0 }
+                const st = ASSET_STATUSES.includes(a.status) ? a.status : 'In Use'
+                types[t][st]++
+                types[t].total++
+              })
+              const rows = Object.values(types)
+              const sum = (k) => rows.reduce((s, r) => s + r[k], 0)
+              return (
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Asset summary — what you have &amp; its condition</p>
+                  <DataTable
+                    empty=""
+                    columns={[
+                      { key: 'type', label: 'Device Category', render: (r) => <span className="font-medium">{r.type}</span> },
+                      { key: 'In Use', label: 'In Use', width: '90px', align: 'center', render: (r) => <span className="text-emerald-700 font-semibold tabular-nums">{r['In Use'] || ''}</span> },
+                      { key: 'In Store', label: 'In Store', width: '90px', align: 'center', render: (r) => <span className="text-blue-700 tabular-nums">{r['In Store'] || ''}</span> },
+                      { key: 'Under Repair', label: 'Repair / Damaged', width: '130px', align: 'center', render: (r) => <span className="text-amber-600 font-semibold tabular-nums">{r['Under Repair'] || ''}</span> },
+                      { key: 'Scrapped', label: 'Scrapped', width: '90px', align: 'center', render: (r) => <span className="text-red-600 tabular-nums">{r['Scrapped'] || ''}</span> },
+                      { key: 'total', label: 'Total', width: '80px', align: 'center', render: (r) => <span className="font-semibold tabular-nums">{r.total}</span> },
+                    ]}
+                    rows={rows}
+                    footer={
+                      <>
+                        <td className="px-3 py-2 text-xs uppercase text-slate-600">All categories</td>
+                        <td className="px-3 py-2 text-center tabular-nums text-emerald-700">{sum('In Use')}</td>
+                        <td className="px-3 py-2 text-center tabular-nums text-blue-700">{sum('In Store')}</td>
+                        <td className="px-3 py-2 text-center tabular-nums text-amber-600">{sum('Under Repair')}</td>
+                        <td className="px-3 py-2 text-center tabular-nums text-red-600">{sum('Scrapped')}</td>
+                        <td className="px-3 py-2 text-center tabular-nums font-semibold">{sum('total')}</td>
+                      </>
+                    }
+                  />
+                </div>
+              )
+            })()}
+
             <DataTable
               empty="No assets registered yet. Add your IT devices here — desktops, printers, CCTV, servers — and allot them to your employees."
               columns={[
@@ -286,6 +335,11 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
                 { key: 'serial_number', label: 'Serial No.', width: '140px', render: (a) => <span className="font-mono text-xs">{a.serial_number}</span> },
                 { key: 'assigned', label: 'Allotted To', width: '160px', render: (a) => a.assigned_to ? (<span>{a.assigned_to}{a.department && <span className="block text-xs text-slate-500">{a.department}</span>}</span>) : <span className="text-slate-400">Unallotted</span> },
                 { key: 'status', label: 'Status', width: '110px', render: (a) => <span className={chip(assetStatusTone[a.status] || 'bg-slate-100 text-slate-600')}>{a.status || 'In Use'}</span> },
+                { key: 'warranty', label: 'Warranty / AMC', width: '130px', render: (a) => {
+                  if (!a.warranty_till) return <span className="text-slate-300 text-xs">—</span>
+                  const exp = new Date(a.warranty_till + 'T23:59:59') < new Date()
+                  return <span className={`text-xs ${exp ? 'text-red-600' : 'text-emerald-700'}`}>{exp ? 'Expired ' : 'Till '}{a.warranty_till}</span>
+                } },
                 { key: 'location', label: 'Location', render: (a) => <span className="text-slate-600">{a.location}</span> },
                 { key: 'act', label: 'Actions', width: '120px', render: (a) => (
                   <span className="text-xs font-medium">

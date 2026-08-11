@@ -399,7 +399,7 @@ export default function AmcApp({ session, onSignOut }) {
               </div>
             )}
 
-            {tab === 'assets' && <AssetsTab customers={customers} assets={assets} reload={loadAll} flash={flash} />}
+            {tab === 'assets' && <AssetsTab customers={customers} assets={assets} reload={loadAll} flash={flash} role={role} />}
             {tab === 'tickets' && <TicketsTab customers={customers} assets={assets} tickets={tickets} reload={loadAll} flash={flash} session={session} role={role} />}
             {tab === 'attendance' && <AttendanceTab customers={customers} attendance={attendance} reload={loadAll} flash={flash} session={session} />}
             {tab === 'expenses' && <ExpensesTab customers={customers} expenses={expenses} reload={loadAll} flash={flash} session={session} role={role} />}

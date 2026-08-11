@@ -25,10 +25,25 @@ const emptyAsset = {
   assigned_to: '',
   department: '',
   status: 'In Use',
+  purchase_date: '',
+  warranty_start: '',
+  warranty_till: '',
+  next_service_due: '',
+  vendor: '',
+  invoice_no: '',
+  cost: '',
   notes: '',
 }
 
-export default function AssetsTab({ customers, assets, reload, flash }) {
+const dateOrNull = (v) => (v ? v : null)
+const warrantyState = (a) => {
+  if (!a.warranty_till) return null
+  const d = Math.ceil((new Date(a.warranty_till + 'T23:59:59') - new Date()) / 86400000)
+  return d < 0 ? { label: 'Expired ' + a.warranty_till, tone: 'text-red-600' } : { label: 'Till ' + a.warranty_till, tone: d <= 30 ? 'text-amber-600' : 'text-emerald-700' }
+}
+
+export default function AssetsTab({ customers, assets, reload, flash, role }) {
+  const canDates = role === 'admin' || role === 'operations'
   const [form, setForm] = useState(null)
   const [filterCustomer, setFilterCustomer] = useState('All')
 
@@ -56,6 +71,11 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
     }
     const row = { ...form }
     delete row.created_at
+    row.purchase_date = dateOrNull(row.purchase_date)
+    row.warranty_start = dateOrNull(row.warranty_start)
+    row.warranty_till = dateOrNull(row.warranty_till)
+    row.next_service_due = dateOrNull(row.next_service_due)
+    row.cost = row.cost === '' || row.cost === null ? null : Number(row.cost)
     let error
     if (row.id) {
       ;({ error } = await supabase.from('assets').update(row).eq('id', row.id))
@@ -172,6 +192,37 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
               {ASSET_STATUSES.map((s) => <option key={s}>{s}</option>)}
             </select>
           </div>
+          {canDates && (
+            <>
+              <div>
+                <span className={label}>Purchase date</span>
+                <input type="date" className={input} value={form.purchase_date || ''} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} />
+              </div>
+              <div>
+                <span className={label}>Warranty / AMC start</span>
+                <input type="date" className={input} value={form.warranty_start || ''} onChange={(e) => setForm({ ...form, warranty_start: e.target.value })} />
+              </div>
+              <div>
+                <span className={label}>Warranty / AMC end</span>
+                <input type="date" className={input} value={form.warranty_till || ''} onChange={(e) => setForm({ ...form, warranty_till: e.target.value })} />
+              </div>
+              <div>
+                <span className={label}>Next service due (PM)</span>
+                <input type="date" className={input} value={form.next_service_due || ''} onChange={(e) => setForm({ ...form, next_service_due: e.target.value })} />
+              </div>
+              <div>
+                <span className={label}>Vendor / supplier</span>
+                <input className={input} value={form.vendor || ''} onChange={(e) => setForm({ ...form, vendor: e.target.value })} />
+              </div>
+              <div>
+                <span className={label}>Invoice no. / Cost (₹)</span>
+                <div className="flex gap-2">
+                  <input className={input} value={form.invoice_no || ''} onChange={(e) => setForm({ ...form, invoice_no: e.target.value })} placeholder="Invoice" />
+                  <input type="number" className={input} value={form.cost ?? ''} onChange={(e) => setForm({ ...form, cost: e.target.value })} placeholder="Cost" />
+                </div>
+              </div>
+            </>
+          )}
           <div className="md:col-span-3">
             <span className={label}>Notes</span>
             <textarea className={input} rows={2} value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -193,6 +244,15 @@ export default function AssetsTab({ customers, assets, reload, flash }) {
           { key: 'serial_number', label: 'Serial No.', width: '140px', render: (a) => <span className="font-mono text-xs">{a.serial_number}</span> },
           { key: 'assigned', label: 'Assigned To', width: '150px', render: (a) => a.assigned_to ? (<span>{a.assigned_to}{a.department && <span className="block text-xs text-slate-500">{a.department}</span>}</span>) : '' },
           { key: 'status', label: 'Status', width: '110px', render: (a) => <span className={chip(assetStatusTone[a.status] || 'bg-slate-100 text-slate-600')}>{a.status || 'In Use'}</span> },
+          { key: 'warranty', label: 'Warranty / PM', width: '150px', render: (a) => {
+            const w = warrantyState(a)
+            return (
+              <span className="text-xs">
+                {w ? <span className={w.tone}>{w.label}</span> : <span className="text-slate-300">—</span>}
+                {a.next_service_due && <span className="block text-slate-500">PM: {a.next_service_due}</span>}
+              </span>
+            )
+          } },
           { key: 'location', label: 'Location', render: (a) => <span className="text-slate-600">{a.location}</span> },
           { key: 'act', label: 'Actions', width: '220px', render: (a) => (
             <span className="text-xs font-medium">

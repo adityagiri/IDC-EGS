@@ -32,3 +32,7 @@ export const ISSUE_OPTIONS = ['No issue found','Hardware fault','Software issue'
 export const TICKET_PRIORITIES = ['Low','Medium','High','Critical']
 export const TICKET_STATUSES = ['Open','In Progress','On Hold','Resolved','Closed']
 export const ASSET_STATUSES = ['In Use','In Store','Under Repair','Scrapped']
+export const TICKET_CATEGORIES = ['Hardware','Software','Network / Internet','Printer','CCTV','Server','Email / O365','Other']
+// SLA target hours by priority — due date auto-set when a ticket is raised
+export const SLA_HOURS = { Critical: 4, High: 8, Medium: 24, Low: 72 }
+export const slaDue = (priority) => new Date(Date.now() + (SLA_HOURS[priority] || 24) * 3600000).toISOString()
