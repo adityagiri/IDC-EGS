@@ -56,22 +56,24 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
         <form onSubmit={signIn} className="bg-white rounded-xl shadow-xl w-full max-w-sm p-8">
-          <h1 className="text-xl font-semibold text-slate-900">AMC Command Center</h1>
-          <p className="text-sm text-slate-500 mt-1 mb-6">India Digital Corporation · EasyGo Solutions</p>
+          <img src="/logo.png" alt="EasyGo Solution" className="h-16 mb-4" />
+          <h1 className="text-xl font-semibold text-slate-900">EasyGo Solutions — Central Login</h1>
+          <p className="text-sm text-slate-500 mt-1 mb-1">India Digital Corporation · EasyGo Solutions</p>
+          <p className="text-xs text-rose-600 font-medium mb-6">Sales goes up &amp; down — service stays forever ∞</p>
           {route.page === 'asset' && (
-            <p className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md px-3 py-2 mb-4">
+            <p className="text-xs bg-rose-50 border border-rose-200 text-rose-700 rounded-md px-3 py-2 mb-4">
               Sign in to open asset {route.code}
             </p>
           )}
           <label className="block text-xs font-medium text-slate-500 mb-1">Email</label>
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-rose-500" />
           <label className="block text-xs font-medium text-slate-500 mb-1">Password</label>
           <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-rose-500" />
           {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
           <button type="submit" disabled={busy}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-md py-2 text-sm font-medium disabled:opacity-60">
+            className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-md py-2 text-sm font-medium disabled:opacity-60">
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
           <p className="text-xs text-slate-400 mt-4">Accounts are created by the administrator. Contact Santosh if you need access.</p>
@@ -112,7 +114,7 @@ function Gate({ session, route }) {
           <p className="text-sm text-slate-500 mt-2">
             Your login exists but is not linked to a staff role or a customer account. Please contact the administrator.
           </p>
-          <button onClick={() => supabase.auth.signOut()} className="mt-4 text-sm text-indigo-600 hover:underline">Sign out</button>
+          <button onClick={() => supabase.auth.signOut()} className="mt-4 text-sm text-rose-600 hover:underline">Sign out</button>
         </div>
       </div>
     )

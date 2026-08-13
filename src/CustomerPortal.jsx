@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 import { DataTable, chip } from './ui'
 import { DEVICE_TYPE_LIST, ASSET_STATUSES, TICKET_CATEGORIES, slaDue } from './checklists'
 
-const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500'
 const label = 'block text-xs font-medium text-slate-500 mb-1'
 const btn = 'px-4 py-2 rounded-md text-sm font-medium'
 
@@ -114,15 +114,18 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="bg-slate-900 text-white border-b-4 border-indigo-600">
+      <header className="bg-slate-900 text-white border-b-4 border-rose-600">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center gap-3 justify-between">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">SUPPORT PORTAL</h1>
-            <p className="text-slate-400 text-xs">{customer.company} · India Digital Corporation / EasyGo Solutions</p>
+          <div className="flex items-center gap-3">
+            <span className="bg-white rounded-md p-1.5 inline-flex"><img src="/logo.png" alt="EasyGo Solution" className="h-9" /></span>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight">SUPPORT PORTAL</h1>
+              <p className="text-slate-400 text-xs">{customer.company} · India Digital Corporation / EasyGo Solutions</p>
+            </div>
           </div>
           <div className="text-right">
             <p className="text-xs text-slate-300">{session.user.email}</p>
-            <button onClick={onSignOut} className="text-xs text-indigo-300 hover:text-white">Sign out</button>
+            <button onClick={onSignOut} className="text-xs text-rose-300 hover:text-white">Sign out</button>
           </div>
         </div>
         <nav className="max-w-6xl mx-auto px-4 flex gap-0.5">
@@ -146,7 +149,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
             ['Tickets Raised', stats.raised, ''],
             ['Resolved', stats.resolved, 'text-emerald-600'],
             ['Pending', stats.pending, stats.pending > 0 ? 'text-red-600' : ''],
-            ['Registered Assets', stats.assets, 'text-indigo-700'],
+            ['Registered Assets', stats.assets, 'text-rose-700'],
           ].map(([t, v, tone]) => (
             <div key={t} className="bg-white p-4">
               <p className="text-xs uppercase tracking-wide text-slate-500">{t}</p>
@@ -161,11 +164,11 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
           <>
             {!form ? (
               <button onClick={() => setForm({ title: '', description: '', affected_user: '', asset_id: '', priority: 'Medium', category: 'Hardware' })}
-                className={`${btn} w-full md:w-auto bg-indigo-600 text-white hover:bg-indigo-700 py-3`}>
+                className={`${btn} w-full md:w-auto bg-rose-600 text-white hover:bg-rose-700 py-3`}>
                 + Raise a new complaint / ticket
               </button>
             ) : (
-              <div className="bg-white border border-indigo-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
+              <div className="bg-white border border-rose-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
                 <div className="md:col-span-2">
                   <span className={label}>What is the issue? *</span>
                   <input className={input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Printer in accounts department not working" />
@@ -198,7 +201,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
                   <textarea className={input} rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </div>
                 <div className="md:col-span-3 flex gap-2">
-                  <button onClick={submitTicket} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Submit ticket</button>
+                  <button onClick={submitTicket} className={`${btn} bg-rose-600 text-white hover:bg-rose-700`}>Submit ticket</button>
                   <button onClick={() => setForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
                 </div>
               </div>
@@ -211,7 +214,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
                 { key: 'title', label: 'Issue', render: (t) => (
                   <span>
                     <span className="font-medium">{t.title}</span>
-                    {t.affected_user && <span className="block text-xs text-indigo-700 mt-0.5">For: {t.affected_user}</span>}
+                    {t.affected_user && <span className="block text-xs text-rose-700 mt-0.5">For: {t.affected_user}</span>}
                     {t.description && <span className="block text-xs text-slate-500 mt-0.5">{t.description}</span>}
                   </span>
                 ) },
@@ -233,13 +236,13 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
                 <h2 className="font-semibold text-slate-800">Your Asset Register</h2>
                 <p className="text-xs text-slate-500 mt-0.5">Manage your own IT assets — allot to employees, track status. Our service team sees the same list.</p>
               </div>
-              <button onClick={() => setAssetForm({ ...emptyAsset })} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>
+              <button onClick={() => setAssetForm({ ...emptyAsset })} className={`${btn} bg-rose-600 text-white hover:bg-rose-700`}>
                 + Add asset
               </button>
             </div>
 
             {assetForm && (
-              <div className="bg-white border border-indigo-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
+              <div className="bg-white border border-rose-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
                 <div>
                   <span className={label}>Device type</span>
                   <select className={input} value={assetForm.device_type} onChange={(e) => setAssetForm({ ...assetForm, device_type: e.target.value })}>
@@ -280,7 +283,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
                   <input className={input} value={assetForm.notes || ''} onChange={(e) => setAssetForm({ ...assetForm, notes: e.target.value })} />
                 </div>
                 <div className="md:col-span-3 flex gap-2">
-                  <button onClick={saveAsset} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save asset</button>
+                  <button onClick={saveAsset} className={`${btn} bg-rose-600 text-white hover:bg-rose-700`}>Save asset</button>
                   <button onClick={() => setAssetForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
                 </div>
               </div>
@@ -329,7 +332,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
             <DataTable
               empty="No assets registered yet. Add your IT devices here — desktops, printers, CCTV, servers — and allot them to your employees."
               columns={[
-                { key: 'asset_code', label: 'Code', width: '110px', render: (a) => <span className="font-mono font-semibold text-indigo-700">{a.asset_code}</span> },
+                { key: 'asset_code', label: 'Code', width: '110px', render: (a) => <span className="font-mono font-semibold text-rose-700">{a.asset_code}</span> },
                 { key: 'device_type', label: 'Device', width: '160px' },
                 { key: 'brand', label: 'Brand / Model', render: (a) => `${a.brand || ''} ${a.model || ''}`.trim() },
                 { key: 'serial_number', label: 'Serial No.', width: '140px', render: (a) => <span className="font-mono text-xs">{a.serial_number}</span> },
@@ -343,7 +346,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
                 { key: 'location', label: 'Location', render: (a) => <span className="text-slate-600">{a.location}</span> },
                 { key: 'act', label: 'Actions', width: '120px', render: (a) => (
                   <span className="text-xs font-medium">
-                    <button onClick={() => setAssetForm({ ...a })} className="text-indigo-700 hover:underline mr-2">Edit</button>
+                    <button onClick={() => setAssetForm({ ...a })} className="text-rose-700 hover:underline mr-2">Edit</button>
                     <button onClick={() => removeAsset(a)} className="text-red-600 hover:underline">Remove</button>
                   </span>
                 ) },
@@ -354,7 +357,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
         )}
 
         <p className="text-xs text-slate-400">
-          For urgent issues you can also call our support line. Resolved tickets trigger a feedback email — your ratings directly reach management.
+          For urgent issues you can also call our support line. Resolved tickets trigger a feedback email — your ratings directly reach management. <span className="text-rose-600 font-medium">Sales goes up &amp; down — service stays forever ∞</span>
         </p>
       </main>
     </div>

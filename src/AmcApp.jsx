@@ -13,7 +13,7 @@ const SEGMENTS = ['Real Estate', 'Hospital / Healthcare', 'Education', 'SMB / Re
 const TIERS = ['Bronze', 'Silver', 'Gold', 'Custom']
 const BILLING = ['Annual', 'Half-Yearly', 'Quarterly', 'Monthly']
 
-const ventureStyle = { IDC: 'bg-indigo-100 text-indigo-800', EasyGo: 'bg-teal-100 text-teal-800' }
+const ventureStyle = { IDC: 'bg-rose-100 text-rose-800', EasyGo: 'bg-teal-100 text-teal-800' }
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })
 const daysLeft = (end) => (end ? Math.ceil((new Date(end + 'T23:59:59') - new Date()) / 86400000) : null)
 const contractStatus = (c) => {
@@ -27,7 +27,7 @@ const contractStatus = (c) => {
   return { label: `${d}d left`, tone: 'bg-emerald-100 text-emerald-700' }
 }
 
-const emptyCustomer = { venture: 'IDC', company: '', contact: '', phone: '', email: '', segment: 'Real Estate', notes: '' }
+const emptyCustomer = { venture: 'IDC', company: '', contact: '', phone: '', email: '', cc_emails: '', segment: 'Real Estate', notes: '' }
 const emptyContract = { customer_id: '', tier: 'Silver', value: '', billing: 'Annual', start_date: '', end_date: '', scope: '' }
 
 export default function AmcApp({ session, onSignOut }) {
@@ -197,23 +197,26 @@ export default function AmcApp({ session, onSignOut }) {
     loadAll()
   }
 
-  const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+  const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500'
   const label = 'block text-xs font-medium text-slate-500 mb-1'
   const btn = 'px-4 py-2 rounded-md text-sm font-medium'
 
   const act = (fn, text, tone) => (
-    <button onClick={fn} className={`text-xs ${tone || 'text-indigo-700'} hover:underline font-medium mr-2`}>
+    <button onClick={fn} className={`text-xs ${tone || 'text-rose-700'} hover:underline font-medium mr-2`}>
       {text}
     </button>
   )
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="bg-slate-900 text-white border-b-4 border-indigo-600">
+      <header className="bg-slate-900 text-white border-b-4 border-rose-600">
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center gap-4 justify-between">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">AMC COMMAND CENTER</h1>
-            <p className="text-slate-400 text-xs">India Digital Corporation · EasyGo Solutions · ERP</p>
+          <div className="flex items-center gap-3">
+            <span className="bg-white rounded-md p-1.5 inline-flex"><img src="/logo.png" alt="EasyGo Solution" className="h-9" /></span>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight">EASYGO SOLUTIONS</h1>
+              <p className="text-slate-400 text-xs">India Digital Corporation · EasyGo Solutions · ERP</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-emerald-400 h-4">{notice}</span>
@@ -223,7 +226,7 @@ export default function AmcApp({ session, onSignOut }) {
             </select>
             <div className="text-right border-l border-slate-700 pl-3">
               <p className="text-xs text-slate-300">{session.user.email}</p>
-              <p className="text-xs text-slate-500 uppercase">{role} · <button onClick={onSignOut} className="text-indigo-300 hover:text-white normal-case">Sign out</button></p>
+              <p className="text-xs text-slate-500 uppercase">{role} · <button onClick={onSignOut} className="text-rose-300 hover:text-white normal-case">Sign out</button></p>
             </div>
           </div>
         </div>
@@ -270,7 +273,7 @@ export default function AmcApp({ session, onSignOut }) {
                     ['Renew 0–30 days', metrics.d30, 'text-red-600'],
                     ['Renew 31–60 days', metrics.d60, 'text-amber-600'],
                     ['Renew 61–90 days', metrics.d90, 'text-yellow-600'],
-                    ['Assets Managed', metrics.assets, 'text-indigo-700'],
+                    ['Assets Managed', metrics.assets, 'text-rose-700'],
                   ].map(([t, v, tone]) => (
                     <div key={t} className="bg-white p-4">
                       <p className="text-xs uppercase tracking-wide text-slate-500">{t}</p>
@@ -300,11 +303,11 @@ export default function AmcApp({ session, onSignOut }) {
             {tab === 'customers' && (
               <div className="space-y-4">
                 <SectionBar title={`Customers (${visibleCustomers.length})`} subtitle="Master list of AMC clients across both ventures">
-                  <button onClick={() => setCustForm({ ...emptyCustomer })} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>+ Add customer</button>
+                  <button onClick={() => setCustForm({ ...emptyCustomer })} className={`${btn} bg-rose-600 text-white hover:bg-rose-700`}>+ Add customer</button>
                 </SectionBar>
 
                 {custForm && (
-                  <div className="bg-white border border-indigo-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
+                  <div className="bg-white border border-rose-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
                     <div><span className={label}>Venture</span>
                       <select className={input} value={custForm.venture} onChange={(e) => setCustForm({ ...custForm, venture: e.target.value })}>{VENTURES.map((v) => <option key={v}>{v}</option>)}</select></div>
                     <div><span className={label}>Company *</span>
@@ -317,10 +320,12 @@ export default function AmcApp({ session, onSignOut }) {
                       <input className={input} value={custForm.phone || ''} onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })} /></div>
                     <div><span className={label}>Email (used for customer portal login)</span>
                       <input className={input} value={custForm.email || ''} onChange={(e) => setCustForm({ ...custForm, email: e.target.value })} /></div>
+                    <div className="md:col-span-2"><span className={label}>Additional emails — CC on every ticket email (comma separated)</span>
+                      <input className={input} value={custForm.cc_emails || ''} onChange={(e) => setCustForm({ ...custForm, cc_emails: e.target.value })} placeholder="manager@client.com, itdesk@client.com" /></div>
                     <div className="md:col-span-3"><span className={label}>Notes</span>
                       <textarea className={input} rows={2} value={custForm.notes || ''} onChange={(e) => setCustForm({ ...custForm, notes: e.target.value })} /></div>
                     <div className="md:col-span-3 flex gap-2">
-                      <button onClick={saveCustomer} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save</button>
+                      <button onClick={saveCustomer} className={`${btn} bg-rose-600 text-white hover:bg-rose-700`}>Save</button>
                       <button onClick={() => setCustForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
                     </div>
                   </div>
@@ -346,11 +351,11 @@ export default function AmcApp({ session, onSignOut }) {
             {tab === 'contracts' && (
               <div className="space-y-4">
                 <SectionBar title={`AMC Contracts (${visibleContracts.length})`} subtitle="Close (not delete) contracts that end — history stays for renewals and audits">
-                  <button onClick={() => setConForm({ ...emptyContract })} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50`} disabled={customers.length === 0}>+ Add contract</button>
+                  <button onClick={() => setConForm({ ...emptyContract })} className={`${btn} bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50`} disabled={customers.length === 0}>+ Add contract</button>
                 </SectionBar>
 
                 {conForm && (
-                  <div className="bg-white border border-indigo-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
+                  <div className="bg-white border border-rose-300 rounded-md p-4 grid md:grid-cols-3 gap-3">
                     <div><span className={label}>Customer *</span>
                       <select className={input} value={conForm.customer_id} onChange={(e) => setConForm({ ...conForm, customer_id: e.target.value })}>
                         <option value="">Select…</option>
@@ -369,7 +374,7 @@ export default function AmcApp({ session, onSignOut }) {
                     <div className="md:col-span-3"><span className={label}>Scope / contract type (shown on the renewal radar)</span>
                       <textarea className={input} rows={2} value={conForm.scope || ''} onChange={(e) => setConForm({ ...conForm, scope: e.target.value })} placeholder="e.g. 25 desktops + 2 servers + CCTV · 24hr response SLA" /></div>
                     <div className="md:col-span-3 flex gap-2">
-                      <button onClick={saveContract} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save</button>
+                      <button onClick={saveContract} className={`${btn} bg-rose-600 text-white hover:bg-rose-700`}>Save</button>
                       <button onClick={() => setConForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
                     </div>
                   </div>
