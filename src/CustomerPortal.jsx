@@ -31,7 +31,8 @@ const tatDays = (t) => {
 
 const emptyAsset = { device_type: 'Desktop / Laptop', brand: '', model: '', serial_number: '', location: '', assigned_to: '', department: '', status: 'In Use', notes: '' }
 
-export default function CustomerPortal({ customer, session, onSignOut }) {
+export default function CustomerPortal({ customer, portalRole, session, onSignOut }) {
+  const isPortalAdmin = portalRole === 'portal-admin'
   const [tab, setTab] = useState('tickets')
   const [tickets, setTickets] = useState([])
   const [assets, setAssets] = useState([])
@@ -85,6 +86,44 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
     load()
   }
 
+  // ---- Ticket handling (portal admin / on-site FMS only) ----
+  const fmsStatus = async (t, status) => {
+    const patch = { status }
+    if (status === 'Resolved') {
+      const who = window.prompt('Resolved by which person on your team? (name)', t.fms_owner || session.user.email) 
+      if (who === null) return
+      patch.resolved_by = (who.trim() || session.user.email) + ' (on-site FMS)'
+      patch.resolved_at = new Date().toISOString()
+      patch.resolved_side = 'Customer FMS'
+      if (who.trim()) patch.fms_owner = who.trim()
+    }
+    if (status === 'Open') {
+      patch.resolved_by = null
+      patch.resolved_at = null
+      patch.resolved_side = null
+    }
+    const { error } = await supabase.from('tickets').update(patch).eq('id', t.id)
+    if (error) return flash('Update failed: ' + error.message)
+    flash('Ticket updated ✓')
+    load()
+  }
+
+  const assignFms = async (t) => {
+    const who = window.prompt('Assign this ticket to which person on your team?', t.fms_owner || '')
+    if (who === null) return
+    const { error } = await supabase.from('tickets').update({ fms_owner: who.trim() || null }).eq('id', t.id)
+    if (error) return flash('Update failed: ' + error.message)
+    load()
+  }
+
+  const escalate = async (t) => {
+    if (!window.confirm('Escalate to the EasyGo / IDC support team? They will be notified and take over this ticket.')) return
+    const { error } = await supabase.from('tickets').update({ status: 'Open', priority: t.priority === 'Critical' ? 'Critical' : 'High', fms_owner: (t.fms_owner || '') + ' → escalated to IDC' }).eq('id', t.id)
+    if (error) return flash('Escalation failed: ' + error.message)
+    flash('Escalated to the IDC / EasyGo team ✓')
+    load()
+  }
+
   // ---- Assets (self-service asset management) ----
   const saveAsset = async () => {
     if (!assetForm.serial_number.trim()) return flash('Serial number is required')
@@ -119,7 +158,7 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
           <div className="flex items-center gap-3">
             <span className="bg-white rounded-md p-1.5 inline-flex"><img src="/logo.png" alt="EasyGo Solution" className="h-9" /></span>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight">SUPPORT PORTAL</h1>
+              <h1 className="text-lg font-semibold tracking-tight">SUPPORT PORTAL{isPortalAdmin ? ' — ADMIN' : ''}</h1>
               <p className="text-slate-400 text-xs">{customer.company} · India Digital Corporation / EasyGo Solutions</p>
             </div>
           </div>
@@ -143,6 +182,11 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
 
       <main className="max-w-6xl mx-auto px-4 py-5 space-y-4">
         {notice && <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">{notice}</p>}
+        {isPortalAdmin && (
+          <p className="text-xs text-slate-600 bg-white border border-slate-300 rounded-md px-3 py-2">
+            <b>Portal admin access</b> — your on-site team can assign, work and resolve tickets here. Anything your team cannot fix, use <b>Escalate to IDC</b> and our engineers take over.
+          </p>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-300 border border-slate-300 rounded-md overflow-hidden">
           {[
@@ -225,6 +269,28 @@ export default function CustomerPortal({ customer, session, onSignOut }) {
                   const d = tatDays(t)
                   return d !== null ? <span className="text-xs text-emerald-700 tabular-nums">{d} days</span> : ''
                 } },
+                ...(isPortalAdmin
+                  ? [
+                      { key: 'owner', label: 'Handled By', width: '150px', render: (t) => (
+                        <span className="text-xs">
+                          {t.fms_owner ? <span>{t.fms_owner}</span> : <span className="text-slate-400">Unassigned</span>}
+                          {t.resolved_by && <span className="block text-slate-400 mt-0.5">Closed: {t.resolved_by}</span>}
+                        </span>
+                      ) },
+                      { key: 'act', label: 'Actions', width: '230px', render: (t) => {
+                        const open = t.status !== 'Resolved' && t.status !== 'Closed'
+                        return (
+                          <span className="text-xs font-medium">
+                            {open && <button onClick={() => assignFms(t)} className="text-rose-700 hover:underline mr-2">Assign</button>}
+                            {t.status === 'Open' && <button onClick={() => fmsStatus(t, 'In Progress')} className="text-rose-700 hover:underline mr-2">Start</button>}
+                            {open && <button onClick={() => fmsStatus(t, 'Resolved')} className="text-emerald-700 hover:underline mr-2">Resolve</button>}
+                            {open && <button onClick={() => escalate(t)} className="text-amber-600 hover:underline mr-2">Escalate to IDC</button>}
+                            {!open && <button onClick={() => fmsStatus(t, 'Open')} className="text-slate-500 hover:underline">Reopen</button>}
+                          </span>
+                        )
+                      } },
+                    ]
+                  : []),
               ]}
               rows={tickets}
             />

@@ -86,7 +86,7 @@ export default function App() {
 
 // Decides whether the logged-in user is staff or a customer
 function Gate({ session, route }) {
-  const [state, setState] = useState({ loading: true, kind: null, customer: null })
+  const [state, setState] = useState({ loading: true, kind: null, customer: null, portalRole: null })
 
   useEffect(() => {
     ;(async () => {
@@ -94,8 +94,14 @@ function Gate({ session, route }) {
       const { data: staff } = await supabase.from('staff_roles').select('email')
       const isStaff = (staff || []).some((s) => s.email.toLowerCase() === email.toLowerCase()) || (staff || []).length === 0
       if (isStaff) return setState({ loading: false, kind: 'staff', customer: null })
+      // Extra portal logins (on-site FMS admins / additional users) come first
+      const { data: cu } = await supabase.from('customer_users').select('customer_id, role, name').ilike('email', email).maybeSingle()
+      if (cu) {
+        const { data: linked } = await supabase.from('customers').select('*').eq('id', cu.customer_id).maybeSingle()
+        if (linked) return setState({ loading: false, kind: 'customer', customer: linked, portalRole: cu.role || 'portal-user' })
+      }
       const { data: cust } = await supabase.from('customers').select('*').ilike('email', email).maybeSingle()
-      if (cust) return setState({ loading: false, kind: 'customer', customer: cust })
+      if (cust) return setState({ loading: false, kind: 'customer', customer: cust, portalRole: 'portal-user' })
       setState({ loading: false, kind: 'none', customer: null })
     })()
   }, [session])
@@ -104,7 +110,7 @@ function Gate({ session, route }) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">Checking access…</div>
 
   if (state.kind === 'customer')
-    return <CustomerPortal customer={state.customer} session={session} onSignOut={() => supabase.auth.signOut()} />
+    return <CustomerPortal customer={state.customer} portalRole={state.portalRole} session={session} onSignOut={() => supabase.auth.signOut()} />
 
   if (state.kind === 'none')
     return (

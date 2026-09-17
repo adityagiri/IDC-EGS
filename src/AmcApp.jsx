@@ -6,6 +6,7 @@ import AttendanceTab from './AttendanceTab'
 import ExpensesTab from './ExpensesTab'
 import ReportsTab from './ReportsTab'
 import TeamTab from './TeamTab'
+import PortalUsersPanel from './PortalUsersPanel'
 import { DataTable, SectionBar, chip } from './ui'
 
 const VENTURES = ['IDC', 'EasyGo']
@@ -46,6 +47,7 @@ export default function AmcApp({ session, onSignOut }) {
   const [conForm, setConForm] = useState(null)
   const [filterVenture, setFilterVenture] = useState('All')
   const [notice, setNotice] = useState('')
+  const [portalFor, setPortalFor] = useState(null)
 
   const flash = (m) => {
     setNotice(m)
@@ -319,7 +321,8 @@ export default function AmcApp({ session, onSignOut }) {
                     <div><span className={label}>Phone</span>
                       <input className={input} value={custForm.phone || ''} onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })} /></div>
                     <div><span className={label}>Email (used for customer portal login)</span>
-                      <input className={input} value={custForm.email || ''} onChange={(e) => setCustForm({ ...custForm, email: e.target.value })} /></div>
+                      <input className={input} value={custForm.email || ''} onChange={(e) => setCustForm({ ...custForm, email: (e.target.value || '').replace(/[,\s]/g, '') })} placeholder="one address only" />
+                      <p className="text-xs text-amber-600 mt-1">One address only — changing this locks the customer out of the portal. Extra recipients go in the CC field below.</p></div>
                     <div className="md:col-span-2"><span className={label}>Additional emails — CC on every ticket email (comma separated)</span>
                       <input className={input} value={custForm.cc_emails || ''} onChange={(e) => setCustForm({ ...custForm, cc_emails: e.target.value })} placeholder="manager@client.com, itdesk@client.com" /></div>
                     <div className="md:col-span-3"><span className={label}>Notes</span>
@@ -331,6 +334,8 @@ export default function AmcApp({ session, onSignOut }) {
                   </div>
                 )}
 
+                {portalFor && <PortalUsersPanel customer={portalFor} onClose={() => setPortalFor(null)} flash={flash} />}
+
                 <DataTable
                   empty="No customers yet — add every AMC client, even informal ones."
                   columns={[
@@ -341,7 +346,7 @@ export default function AmcApp({ session, onSignOut }) {
                     { key: 'phone', label: 'Phone', width: '120px' },
                     { key: 'email', label: 'Email' },
                     { key: 'notes', label: 'Notes', render: (c) => <span className="text-slate-500">{c.notes}</span> },
-                    { key: 'act', label: 'Actions', width: '120px', render: (c) => (<span>{act(() => setCustForm({ ...c }), 'Edit')}{act(() => deleteCustomer(c.id), 'Delete', 'text-red-600')}</span>) },
+                    { key: 'act', label: 'Actions', width: '200px', render: (c) => (<span>{act(() => setCustForm({ ...c }), 'Edit')}{act(() => setPortalFor(c), 'Portal logins')}{act(() => deleteCustomer(c.id), 'Delete', 'text-red-600')}</span>) },
                   ]}
                   rows={visibleCustomers}
                 />

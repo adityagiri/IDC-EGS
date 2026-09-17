@@ -50,6 +50,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
     }
     const filteredTickets = tickets.filter((t) => inMonth(t.created_at))
     filteredTickets.forEach((t) => {
+      if (t.resolved_side === 'Customer FMS') return   // closed by customer's own on-site team
       const row = get(t.assigned_to)
       row['Tickets handled']++
       if (t.status === 'Resolved' || t.status === 'Closed') row['Tickets resolved']++
@@ -93,6 +94,8 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           'Raised by': t.created_by || '',
           'Assigned engineer': t.assigned_to || '',
           'Resolved by': t.resolved_by || '',
+          'Resolved side': t.resolved_side || (t.resolved_by ? 'IDC / EasyGo' : ''),
+          'On-site FMS owner': t.fms_owner || '',
           'Resolved (date-time)': fmtDT(t.resolved_at),
           'TAT (days)': tat(t) ?? '',
           'Repeat call': t.repeat_call ? 'YES' : '',
@@ -106,10 +109,12 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
     const map = {}
     tickets.filter((t) => inMonth(t.created_at)).forEach((t) => {
       const name = customersById[t.customer_id]?.company || 'Unknown'
-      if (!map[name]) map[name] = { Company: name, Raised: 0, Resolved: 0, Pending: 0, _tats: [] }
+      if (!map[name]) map[name] = { Company: name, Raised: 0, Resolved: 0, 'Resolved by own FMS': 0, Pending: 0, _tats: [] }
       map[name].Raised++
-      if (t.status === 'Resolved' || t.status === 'Closed') map[name].Resolved++
-      else map[name].Pending++
+      if (t.status === 'Resolved' || t.status === 'Closed') {
+        map[name].Resolved++
+        if (t.resolved_side === 'Customer FMS') map[name]['Resolved by own FMS']++
+      } else map[name].Pending++
       const d = tat(t)
       if (d !== null) map[name]._tats.push(d)
     })
@@ -233,7 +238,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           <p className="text-sm font-medium">1 · Engineer performance</p>
           <p className="text-xs text-slate-500">Tickets handled/resolved, average TAT, repeat calls (marked by team + auto-detected), service reports, site visits, minutes on site.</p>
         </div>
-        <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Engineer Performance', engineerPerf]], `engineer-performance-${month}.xlsx`)}>
+        <button className={`${btn} bg-rose-600 text-white hover:bg-rose-700`} onClick={() => download([['Engineer Performance', engineerPerf]], `engineer-performance-${month}.xlsx`)}>
           Export Excel
         </button>
       </div>
@@ -243,7 +248,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           <p className="text-sm font-medium">2 · Company-wise tickets</p>
           <p className="text-xs text-slate-500">Raised / resolved / pending / average TAT per customer, plus the full detailed ticket register with date-time stamps.</p>
         </div>
-        <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Company Summary', companyTickets], ['Ticket Register (detailed)', ticketRows]], `company-tickets-${month}.xlsx`)}>
+        <button className={`${btn} bg-rose-600 text-white hover:bg-rose-700`} onClick={() => download([['Company Summary', companyTickets], ['Ticket Register (detailed)', ticketRows]], `company-tickets-${month}.xlsx`)}>
           Export Excel
         </button>
       </div>
@@ -253,7 +258,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           <p className="text-sm font-medium">3 · Expense report — {inr(expenseTotal)} total</p>
           <p className="text-xs text-slate-500">Detailed entries + engineer-wise summary sheet. Filter by month above for monthly claims.</p>
         </div>
-        <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Expense Details', expenseRows], ['By Engineer', expenseByEngineer]], `expenses-${month}.xlsx`)}>
+        <button className={`${btn} bg-rose-600 text-white hover:bg-rose-700`} onClick={() => download([['Expense Details', expenseRows], ['By Engineer', expenseByEngineer]], `expenses-${month}.xlsx`)}>
           Export Excel
         </button>
       </div>
@@ -263,7 +268,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           <p className="text-sm font-medium">4 · AMC contracts & renewals</p>
           <p className="text-xs text-slate-500">Every contract with days-left, scope, and renewal status — your renewal working file.</p>
         </div>
-        <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['AMC Renewals', amcRows]], `amc-renewals.xlsx`)}>
+        <button className={`${btn} bg-rose-600 text-white hover:bg-rose-700`} onClick={() => download([['AMC Renewals', amcRows]], `amc-renewals.xlsx`)}>
           Export Excel
         </button>
       </div>
@@ -273,7 +278,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
           <p className="text-sm font-medium">5 · Service reports register (QR scans)</p>
           <p className="text-xs text-slate-500">Every checklist submitted after scanning an asset — date-time, done by whom, activities performed. {serviceRows.length} in view.</p>
         </div>
-        <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} onClick={() => download([['Service Reports', serviceRows.map(({ id, ...r }) => r)]], `service-reports-${month}.xlsx`)}>
+        <button className={`${btn} bg-rose-600 text-white hover:bg-rose-700`} onClick={() => download([['Service Reports', serviceRows.map(({ id, ...r }) => r)]], `service-reports-${month}.xlsx`)}>
           Export Excel
         </button>
       </div>
@@ -282,7 +287,7 @@ export default function ReportsTab({ customers, contracts, assets, tickets, repo
         empty="No service reports yet. They appear the moment an engineer scans an asset QR and submits the checklist."
         columns={[
           { key: 'Date-time (submitted)', label: 'Date & Time', width: '150px' },
-          { key: 'Asset', label: 'Asset', width: '100px', render: (r) => <span className="font-mono text-xs font-semibold text-indigo-700">{r['Asset']}</span> },
+          { key: 'Asset', label: 'Asset', width: '100px', render: (r) => <span className="font-mono text-xs font-semibold text-rose-700">{r['Asset']}</span> },
           { key: 'Company', label: 'Customer' },
           { key: 'Engineer (done by)', label: 'Done By', width: '170px', render: (r) => <span className="text-xs">{r['Engineer (done by)']}</span> },
           { key: 'Result', label: 'Result', width: '140px' },

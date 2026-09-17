@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 import { TICKET_PRIORITIES, TICKET_STATUSES, TICKET_CATEGORIES, slaDue } from './checklists'
 import { DataTable, chip } from './ui'
 
-const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500'
 const label = 'block text-xs font-medium text-slate-500 mb-1'
 const btn = 'px-4 py-2 rounded-md text-sm font-medium'
 
@@ -77,6 +77,12 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
     if (status === 'Resolved') {
       patch.resolved_by = session.user.email
       patch.resolved_at = new Date().toISOString()
+      const fb = window.prompt(
+        'Send the resolution + feedback form to which email ID?\n(The end user who faced the issue — leave blank to send to the customer\'s main + CC emails. Cancel = do not resolve yet.)',
+        t.feedback_email || ''
+      )
+      if (fb === null) return
+      if (fb.trim()) patch.feedback_email = fb.trim()
     }
     const { error } = await supabase.from('tickets').update(patch).eq('id', t.id)
     if (error) return flash('Update failed: ' + error.message)
@@ -110,12 +116,12 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
         <h2 className="font-medium">Tickets ({visible.length})</h2>
         <div className="flex items-center gap-3">
           <label className="text-xs text-slate-500 flex items-center gap-1.5">
-            <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} className="accent-indigo-600" />
+            <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} className="accent-rose-600" />
             Show resolved/closed
           </label>
           <button
             onClick={() => setForm({ ...emptyTicket })}
-            className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50`}
+            className={`${btn} bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50`}
             disabled={customers.length === 0}
           >
             New ticket
@@ -124,7 +130,7 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
       </div>
 
       {form && (
-        <div className="bg-white border border-indigo-200 rounded-lg p-4 grid md:grid-cols-3 gap-3">
+        <div className="bg-white border border-rose-200 rounded-lg p-4 grid md:grid-cols-3 gap-3">
           <div>
             <span className={label}>Customer *</span>
             <select className={input} value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value, asset_id: '' })}>
@@ -176,7 +182,7 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
             </div>
           )}
           <div className="md:col-span-3 flex gap-2">
-            <button onClick={save} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>Save ticket</button>
+            <button onClick={save} className={`${btn} bg-rose-600 text-white hover:bg-rose-700`}>Save ticket</button>
             <button onClick={() => setForm(null)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>Cancel</button>
           </div>
         </div>
@@ -192,7 +198,7 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
             <span>
               {t.title}
               <span className="block text-xs text-slate-400 mt-0.5">{t.category || ''}{t.channel ? (t.category ? ' · ' : '') + t.channel : ''}</span>
-              {t.affected_user && <span className="block text-xs text-indigo-700 mt-0.5">For: {t.affected_user}</span>}
+              {t.affected_user && <span className="block text-xs text-rose-700 mt-0.5">For: {t.affected_user}</span>}
               {t.description && <span className="block text-xs text-slate-500 mt-0.5">{t.description}</span>}
             </span>
           ) },
@@ -216,13 +222,19 @@ export default function TicketsTab({ customers, assets, tickets, reload, flash, 
             const closed = t.status === 'Resolved' || t.status === 'Closed'
             return <span className={`text-xs tabular-nums ${closed ? 'text-emerald-700' : d > 2 ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>{d}d{closed ? '' : ' open'}</span>
           } },
-          { key: 'resolved', label: 'Resolved By', width: '150px', render: (t) => t.resolved_by ? (<span className="text-xs">{t.resolved_by}<span className="block text-slate-400">{fmtDT(t.resolved_at)}</span></span>) : '' },
+          { key: 'resolved', label: 'Resolved By', width: '160px', render: (t) => t.resolved_by ? (
+            <span className="text-xs">
+              {t.resolved_by}
+              <span className="block text-slate-400">{fmtDT(t.resolved_at)}</span>
+              {t.resolved_side === 'Customer FMS' && <span className={chip('bg-amber-100 text-amber-800') + ' mt-1'}>CUSTOMER FMS</span>}
+            </span>
+          ) : (t.fms_owner ? <span className="text-xs text-slate-500">FMS: {t.fms_owner}</span> : '') },
           { key: 'act', label: 'Actions', width: '200px', render: (t) => (
             <span className="text-xs font-medium">
-              {t.status === 'Open' && <button onClick={() => quickStatus(t, 'In Progress')} className="text-indigo-700 hover:underline mr-2">Start</button>}
+              {t.status === 'Open' && <button onClick={() => quickStatus(t, 'In Progress')} className="text-rose-700 hover:underline mr-2">Start</button>}
               {(t.status === 'Open' || t.status === 'In Progress') && <button onClick={() => quickStatus(t, 'Resolved')} className="text-emerald-700 hover:underline mr-2">Resolve</button>}
               {isMgmt && <button onClick={() => toggleRepeat(t)} className="text-purple-700 hover:underline mr-2">{t.repeat_call ? 'Un-repeat' : 'Mark repeat'}</button>}
-              <button onClick={() => setForm({ ...t })} className="text-indigo-700 hover:underline mr-2">Edit</button>
+              <button onClick={() => setForm({ ...t })} className="text-rose-700 hover:underline mr-2">Edit</button>
               <button onClick={() => remove(t.id)} className="text-red-600 hover:underline">Delete</button>
             </span>
           ) },
