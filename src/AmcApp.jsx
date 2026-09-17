@@ -8,6 +8,7 @@ import ReportsTab from './ReportsTab'
 import TeamTab from './TeamTab'
 import PortalUsersPanel from './PortalUsersPanel'
 import { DataTable, SectionBar, chip } from './ui'
+import Shell from './Shell'
 
 const VENTURES = ['IDC', 'EasyGo']
 const SEGMENTS = ['Real Estate', 'Hospital / Healthcare', 'Education', 'SMB / Retail', 'Manufacturing', 'Other']
@@ -210,56 +211,18 @@ export default function AmcApp({ session, onSignOut }) {
   )
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="bg-slate-900 text-white border-b-4 border-rose-600">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center gap-4 justify-between">
-          <div className="flex items-center gap-3">
-            <span className="bg-white rounded-md p-1.5 inline-flex"><img src="/logo.png" alt="EasyGo Solution" className="h-9" /></span>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">EASYGO SOLUTIONS</h1>
-              <p className="text-slate-400 text-xs">India Digital Corporation · EasyGo Solutions · ERP</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-emerald-400 h-4">{notice}</span>
-            <select value={filterVenture} onChange={(e) => setFilterVenture(e.target.value)} className="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm">
-              <option>All</option>
-              {VENTURES.map((v) => <option key={v}>{v}</option>)}
-            </select>
-            <div className="text-right border-l border-slate-700 pl-3">
-              <p className="text-xs text-slate-300">{session.user.email}</p>
-              <p className="text-xs text-slate-500 uppercase">{role} · <button onClick={onSignOut} className="text-rose-300 hover:text-white normal-case">Sign out</button></p>
-            </div>
-          </div>
-        </div>
-        <nav className="max-w-7xl mx-auto px-4 flex gap-0.5 overflow-x-auto">
-          {[
-            ['dashboard', 'Dashboard', ['admin', 'accounts']],
-            ['customers', 'Customers', ['admin', 'operations']],
-            ['contracts', 'Contracts', ['admin']],
-            ['assets', 'Assets', ['admin', 'engineer', 'operations']],
-            ['tickets', 'Tickets', ['admin', 'accounts', 'engineer', 'operations']],
-            ['attendance', 'Attendance', ['admin', 'engineer', 'operations']],
-            ['expenses', 'Expenses', ['admin', 'accounts', 'engineer', 'operations']],
-            ['reports', 'Reports', ['admin', 'accounts']],
-            ['team', 'Team', ['admin']],
-          ]
-            .filter(([, , roles]) => roles.includes(role))
-            .map(([k, t]) => (
-              <button
-                key={k}
-                onClick={() => setTab(k)}
-                className={`px-4 py-2 text-sm whitespace-nowrap border-t border-l border-r rounded-t ${
-                  tab === k ? 'bg-slate-100 text-slate-900 font-semibold border-slate-300' : 'text-slate-300 border-transparent hover:text-white'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-        </nav>
-      </header>
+    <Shell
+      role={role}
+      tab={tab}
+      setTab={setTab}
+      session={session}
+      onSignOut={onSignOut}
+      notice={notice}
+      filterVenture={filterVenture}
+      setFilterVenture={setFilterVenture}
+      ventures={VENTURES}
+    >
 
-      <main className="max-w-7xl mx-auto px-4 py-5 space-y-4">
         {loading ? (
           <p className="text-sm text-slate-500">Loading data…</p>
         ) : (
@@ -419,7 +382,6 @@ export default function AmcApp({ session, onSignOut }) {
             )}
           </>
         )}
-      </main>
-    </div>
+    </Shell>
   )
 }
